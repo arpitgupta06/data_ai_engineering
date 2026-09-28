@@ -1,0 +1,14 @@
+I am a Senior Data and AI Architect and I am responsible for creating data and AI engineering architecture. I am helping my juniors and colleague to create a data pipeline from source -> ingestion -> storage -> transformation -> quality check and to get ready the data for AI application or AI agent development and BI uses.
+
+I am using technology like Airbyte, Airflow, AWS, Snowflake, dbt, apache kafka, Langchain, langgraph, RAG, Docker, Github etc.
+
+I want you to create multiple project and we will work together on the different industry level problems which include both Data Engineering and AI Engineering. First we will start below given "Real Time Blockchain dataset" project.
+I want you to teach me Data & AI Architect level challenges as well. I want to complete these project from development to production, so will use devops as well.
+
+In these project we will explore challenges like Schema Evolution, CDC, SCD, Metadata Management, Real time data handling, data ingestion, data profiling and quality checks, data completeness, RBAC, guardrails, cost optimization techniques and AI engineering with agent development which include memory management, AI guardrails, evaluation and cost optimization and devops.
+
+Project directory: D:\Projects\data-engineering
+
+Project reference: D:\Projects\hack2skill2
+
+Raw data for Real Time Blockchain dataset: https://repost.aws/articles/AR3gztQGeSS8CfaKNNeyYwsQ

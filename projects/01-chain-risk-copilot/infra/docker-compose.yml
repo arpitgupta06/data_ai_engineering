@@ -1,0 +1,176 @@
+# Chain Risk Copilot — local development stack (ADR 0003).
+#
+#   docker compose -f infra/docker-compose.yml up -d     # start
+#   docker compose -f infra/docker-compose.yml ps        # all long-running services -> (healthy)
+#   docker compose -f infra/docker-compose.yml down      # stop, KEEP data
+#   docker compose -f infra/docker-compose.yml down -v   # stop, WIPE data (named volumes)
+#
+# Credentials come from infra/.env (gitignored); see infra/.env.example.
+#
+# Host ports
+#   19092  Kafka API (external listener)       18081  Schema Registry
+#   18082  HTTP Proxy (pandaproxy)             19644  Redpanda Admin API
+#   8085   Redpanda Console                    9000   MinIO S3 API
+#   9001   MinIO console                       5433   Postgres (ops)
+#   8080 is left free for Airflow.
+
+name: chainrisk
+
+services:
+
+  # ── Streaming: Kafka API + built-in Schema Registry ────────────
+  redpanda:
+    image: redpandadata/redpanda:v26.2.2
+    container_name: chainrisk-redpanda
+    command:
+      - redpanda
+      - start
+      # Dual listeners. Containers use redpanda:9092; the host uses localhost:19092.
+      # A client is handed the *advertised* address after its first connection, so
+      # a host client pointed at the internal listener would connect once, then fail.
+      - --kafka-addr internal://0.0.0.0:9092,external://0.0.0.0:19092
+      - --advertise-kafka-addr internal://redpanda:9092,external://localhost:19092
+      - --pandaproxy-addr internal://0.0.0.0:8082,external://0.0.0.0:18082
+      - --advertise-pandaproxy-addr internal://redpanda:8082,external://localhost:18082
+      - --schema-registry-addr internal://0.0.0.0:8081,external://0.0.0.0:18081
+      - --rpc-addr redpanda:33145
+      - --advertise-rpc-addr redpanda:33145
+      # dev-container: relaxed fsync, overprovisioned CPU — local development only.
+      - --mode dev-container
+      - --smp 1
+      # Cap memory so Redpanda leaves room for Airflow within Docker's 6 GB.
+      - --memory 1G
+      - --reserve-memory 0M
+      - --default-log-level=info
+    ports:
+      - "19092:19092"
+      - "18081:18081"
+      - "18082:18082"
+      - "19644:9644"
+    volumes:
+      - redpanda-data:/var/lib/redpanda/data
+    healthcheck:
+      test: ["CMD-SHELL", "rpk cluster health | grep -E 'Healthy:.+true' || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+    restart: unless-stopped
+
+  redpanda-console:
+    image: redpandadata/console:v3.11.0
+    container_name: chainrisk-redpanda-console
+    # Console reads its config from a file; render it from an env var at startup.
+    # (Pattern from Redpanda's reference compose for this Console version.)
+    entrypoint: /bin/sh
+    command: -c 'echo "$$CONSOLE_CONFIG_FILE" > /tmp/config.yml && exec /app/console'
+    environment:
+      CONFIG_FILEPATH: /tmp/config.yml
+      CONSOLE_CONFIG_FILE: |
+        kafka:
+          brokers: ["redpanda:9092"]
+        schemaRegistry:
+          enabled: true
+          urls: ["http://redpanda:8081"]
+        redpanda:
+          adminApi:
+            enabled: true
+            urls: ["http://redpanda:9644"]
+    ports:
+      # Console listens on 8080 inside the container; publish on 8085 so Airflow
+      # can take host port 8080.
+      - "8085:8080"
+    depends_on:
+      redpanda:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O /dev/null http://localhost:8080/ || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+    restart: unless-stopped
+
+  # ── Object storage: local S3 stand-in for bronze ───────────────
+  minio:
+    # MinIO no longer publishes images to Docker Hub (minio/minio is 404 there).
+    # This is the final community release, still served from quay.io.
+    image: quay.io/minio/minio:RELEASE.2025-09-07T16-13-09Z
+    container_name: chainrisk-minio
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:?set MINIO_ROOT_USER in infra/.env}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:?set MINIO_ROOT_PASSWORD in infra/.env}
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    volumes:
+      - minio-data:/data
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost:9000/minio/health/live"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+    restart: unless-stopped
+
+  minio-init:
+    image: quay.io/minio/mc:RELEASE.2025-08-13T08-35-41Z
+    container_name: chainrisk-minio-init
+    # One-shot. Waiting for *healthy*, not merely *started*: a started MinIO can
+    # still refuse connections, which makes this race and fail only sometimes.
+    depends_on:
+      minio:
+        condition: service_healthy
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:?set MINIO_ROOT_USER in infra/.env}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:?set MINIO_ROOT_PASSWORD in infra/.env}
+    entrypoint: ["/bin/sh", "-c"]
+    # Idempotent: --ignore-existing makes re-running `up` a no-op, not an error.
+    # $$ defers expansion to the container shell, so secrets stay out of the
+    # rendered compose config.
+    command:
+      - |
+        set -e
+        mc alias set local http://minio:9000 "$$MINIO_ROOT_USER" "$$MINIO_ROOT_PASSWORD"
+        mc mb --ignore-existing local/chainrisk-bronze
+        mc mb --ignore-existing local/chainrisk-artifacts
+        mc ls local
+    restart: "no"
+
+  # ── Operational Postgres: watchlists, alert rules, annotations ─
+  postgres-ops:
+    image: postgres:16.15
+    container_name: chainrisk-postgres-ops
+    # Logical replication settings for Debezium (Phase 5). wal_level only takes
+    # effect at server start, so set it now rather than recreate the container later.
+    command:
+      - postgres
+      - -c
+      - wal_level=logical
+      - -c
+      - max_replication_slots=4
+      - -c
+      - max_wal_senders=4
+    environment:
+      POSTGRES_USER: ${POSTGRES_OPS_USER:?set POSTGRES_OPS_USER in infra/.env}
+      POSTGRES_PASSWORD: ${POSTGRES_OPS_PASSWORD:?set POSTGRES_OPS_PASSWORD in infra/.env}
+      POSTGRES_DB: ${POSTGRES_OPS_DB:?set POSTGRES_OPS_DB in infra/.env}
+    ports:
+      # 5433 on the host, so a locally installed Postgres on 5432 doesn't collide.
+      - "5433:5432"
+    volumes:
+      - postgres-ops-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U \"$${POSTGRES_USER}\" -d \"$${POSTGRES_DB}\""]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+    restart: unless-stopped
+
+# Named volumes survive `down`; only `down -v` removes them.
+volumes:
+  redpanda-data:
+  minio-data:
+  postgres-ops-data:

@@ -1,0 +1,253 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1560 1060" width="1560" height="1060" font-family="Segoe UI, Carlito, DejaVu Sans, Helvetica, Arial, sans-serif" role="img" aria-label="Reference architecture for the Chain Risk Copilot: an Ethereum node streams through a producer into Kafka while AWS public blockchain Parquet is backfilled by Airflow; both land in a bronze layer, pass a reorg and reconciliation stage, and are modelled by dbt into silver and gold layers with SCD2 dimensions, which serve a guardrailed LangGraph risk copilot and BI dashboards, over a cross-cutting platform and governance layer.">
+<defs>
+<marker id="arrS" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7"
+        orient="auto-start-reverse"><path d="M0,0.6 L10,5 L0,9.4 z" fill="#59616B"/></marker>
+<marker id="arrB" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7"
+        orient="auto-start-reverse"><path d="M0,0.6 L10,5 L0,9.4 z" fill="#59616B"/></marker>
+</defs>
+<rect width="1560" height="1060" fill="#FBFAF8"/>
+<text x="40" y="46" font-size="27" fill="#1C2024" text-anchor="start" font-weight="700">Chain Risk Copilot — Reference Architecture</text>
+<text x="40" y="70" font-size="13.5" fill="#697280" text-anchor="start" font-weight="400">Project 1 · Ethereum · dual-path ingestion → medallion warehouse → governed AI copilot</text>
+<line x1="1190" y1="34" x2="1224" y2="34" stroke="#59616B" stroke-width="1.8"/>
+<text x="1230" y="38" font-size="11" fill="#697280" text-anchor="start" font-weight="400">continuous / streaming</text>
+<line x1="1190" y1="54" x2="1224" y2="54" stroke="#59616B" stroke-width="1.8" stroke-dasharray="6 4"/>
+<text x="1230" y="58" font-size="11" fill="#697280" text-anchor="start" font-weight="400">scheduled batch</text>
+<rect x="1190" y="68" width="34" height="10" rx="3" fill="#FCE8DC" stroke="#B8400A" stroke-width="1.4"/>
+<text x="1230" y="78" font-size="11" fill="#697280" text-anchor="start" font-weight="400">correctness-critical</text>
+<text x="1520" y="38" font-size="11" fill="#697280" text-anchor="end" font-weight="600">P#  = roadmap phase</text>
+<rect x="24" y="96" width="216" height="716" rx="12" fill="#F4F2EF" stroke="#DAD6D0" stroke-width="1"/>
+<text x="40" y="120" font-size="10.5" fill="#697280" text-anchor="start" font-weight="700" letter-spacing="1.4">SOURCES</text>
+<rect x="264" y="96" width="216" height="716" rx="12" fill="#F4F2EF" stroke="#DAD6D0" stroke-width="1"/>
+<text x="280" y="120" font-size="10.5" fill="#697280" text-anchor="start" font-weight="700" letter-spacing="1.4">INGESTION</text>
+<rect x="504" y="96" width="160" height="716" rx="12" fill="#F4F2EF" stroke="#DAD6D0" stroke-width="1"/>
+<text x="520" y="120" font-size="10.5" fill="#697280" text-anchor="start" font-weight="700" letter-spacing="1.4">TRANSPORT</text>
+<rect x="736" y="96" width="264" height="716" rx="12" fill="#F4F2EF" stroke="#DAD6D0" stroke-width="1"/>
+<text x="752" y="120" font-size="10.5" fill="#697280" text-anchor="start" font-weight="700" letter-spacing="1.4">STORAGE — MEDALLION</text>
+<rect x="1040" y="96" width="496" height="716" rx="12" fill="#F4F2EF" stroke="#DAD6D0" stroke-width="1"/>
+<text x="1056" y="120" font-size="10.5" fill="#697280" text-anchor="start" font-weight="700" letter-spacing="1.4">AI SERVING &amp; CONSUMPTION</text>
+<rect x="40" y="152" width="184" height="68" rx="8" fill="#E7EEF4" stroke="#2F4F6B" stroke-width="1.6"/>
+<rect x="40" y="152" width="4.5" height="68" rx="2" fill="#2F4F6B"/>
+<text x="54" y="173" font-size="13" fill="#1C2024" text-anchor="start" font-weight="700">Ethereum node</text>
+<text x="54" y="189.0" font-size="10.5" fill="#697280" text-anchor="start" font-weight="400">JSON-RPC / WebSocket</text>
+<text x="54" y="202.5" font-size="10.5" fill="#697280" text-anchor="start" font-weight="400">new block ≈ every 12s</text>
+<rect x="40" y="252" width="184" height="68" rx="8" fill="#E7EEF4" stroke="#2F4F6B" stroke-width="1.6"/>
+<rect x="40" y="252" width="4.5" height="68" rx="2" fill="#2F4F6B"/>
+<text x="54" y="273" font-size="13" fill="#1C2024" text-anchor="start" font-weight="700">Operational Postgres</text>
+<text x="54" y="289.0" font-size="10.5" fill="#697280" text-anchor="start" font-weight="400">watchlists · alert rules</text>
+<text x="54" y="302.5" font-size="10.5" fill="#697280" text-anchor="start" font-weight="400">analyst annotations</text>
+<rect x="193.2" y="260" width="22.8" height="15" rx="7.5" fill="#2F4F6B" opacity="0.14"/>
+<text x="204.6" y="271" font-size="9.5" fill="#2F4F6B" text-anchor="middle" font-weight="700">P5</text>
+<rect x="40" y="388" width="184" height="84" rx="8" fill="#E7EEF4" stroke="#2F4F6B" stroke-width="1.6"/>
+<rect x="40" y="388" width="4.5" height="84" rx="2" fill="#2F4F6B"/>
+<text x="54" y="409" font-size="13" fill="#1C2024" text-anchor="start" font-weight="700">AWS public blockchain</text>
+<text x="54" y="425.0" font-size="10.5" fill="#697280" text-anchor="start" font-weight="400">s3://aws-public-blockchain</text>
+<text x="54" y="438.5" font-size="10.5" fill="#697280" text-anchor="start" font-weight="400">Parquet · date=YYYY-MM-DD</text>
+<text x="54" y="452.0" font-size="10.5" fill="#697280" text-anchor="start" font-weight="400">nightly ~01:45 UTC</text>
+<rect x="193.2" y="396" width="22.8" height="15" rx="7.5" fill="#2F4F6B" opacity="0.14"/>
+<text x="204.6" y="407" font-size="9.5" fill="#2F4F6B" text-anchor="middle" font-weight="700">P1</text>
+<rect x="40" y="522" width="184" height="68" rx="8" fill="#E7EEF4" stroke="#2F4F6B" stroke-width="1.6"/>
+<rect x="40" y="522" width="4.5" height="68" rx="2" fill="#2F4F6B"/>
+<text x="54" y="543" font-size="13" fill="#1C2024" text-anchor="start" font-weight="700">Reference APIs</text>
+<text x="54" y="559.0" font-size="10.5" fill="#697280" text-anchor="start" font-weight="400">CoinGecko prices</text>
+<text x="54" y="572.5" font-size="10.5" fill="#697280" text-anchor="start" font-weight="400">label &amp; sanctions lists</text>
+<rect x="193.2" y="530" width="22.8" height="15" rx="7.5" fill="#2F4F6B" opacity="0.14"/>
+<text x="204.6" y="541" font-size="9.5" fill="#2F4F6B" text-anchor="middle" font-weight="700">P4</text>
+<rect x="280" y="152" width="184" height="68" rx="8" fill="#E0EFEC" stroke="#1F6A62" stroke-width="1.6"/>
+<rect x="280" y="152" width="4.5" height="68" rx="2" fill="#1F6A62"/>
+<text x="294" y="173" font-size="13" fill="#1C2024" text-anchor="start" font-weight="700">Stream producer</text>
+<text x="294" y="189.0" font-size="10.5" fill="#697280" text-anchor="start" font-weight="400">block / tx / log tailer</text>
+<text x="294" y="202.5" font-size="10.5" fill="#697280" text-anchor="start" font-weight="400">Avro serialise</text>
+<rect x="433.2" y="160" width="22.8" height="15" rx="7.5" fill="#1F6A62" opacity="0.14"/>
+<text x="444.6" y="171" font-size="9.5" fill="#1F6A62" text-anchor="middle" font-weight="700">P2</text>
+<rect x="280" y="252" width="184" height="68" rx="8" fill="#E0EFEC" stroke="#1F6A62" stroke-width="1.6"/>
+<rect x="280" y="252" width="4.5" height="68" rx="2" fill="#1F6A62"/>
+<text x="294" y="273" font-size="13" fill="#1C2024" text-anchor="start" font-weight="700">Debezium</text>
+<text x="294" y="289.0" font-size="10.5" fill="#697280" text-anchor="start" font-weight="400">Postgres CDC connector</text>
+<rect x="433.2" y="260" width="22.8" height="15" rx="7.5" fill="#1F6A62" opacity="0.14"/>
+<text x="444.6" y="271" font-size="9.5" fill="#1F6A62" text-anchor="middle" font-weight="700">P5</text>
+<rect x="280" y="388" width="184" height="84" rx="8" fill="#E0EFEC" stroke="#1F6A62" stroke-width="1.6"/>
+<rect x="280" y="388" width="4.5" height="84" rx="2" fill="#1F6A62"/>
+<text x="294" y="409" font-size="13" fill="#1C2024" text-anchor="start" font-weight="700">Airflow backfill DAG</text>
+<text x="294" y="425.0" font-size="10.5" fill="#697280" text-anchor="start" font-weight="400">partitioned by date</text>
+<text x="294" y="438.5" font-size="10.5" fill="#697280" text-anchor="start" font-weight="400">idempotent · replayable</text>
+<text x="294" y="452.0" font-size="10.5" fill="#697280" text-anchor="start" font-weight="400">profiling on land</text>
+<rect x="433.2" y="396" width="22.8" height="15" rx="7.5" fill="#1F6A62" opacity="0.14"/>
+<text x="444.6" y="407" font-size="9.5" fill="#1F6A62" text-anchor="middle" font-weight="700">P1</text>
+<rect x="280" y="522" width="184" height="68" rx="8" fill="#E0EFEC" stroke="#1F6A62" stroke-width="1.6"/>
+<rect x="280" y="522" width="4.5" height="68" rx="2" fill="#1F6A62"/>
+<text x="294" y="543" font-size="13" fill="#1C2024" text-anchor="start" font-weight="700">Airbyte</text>
+<text x="294" y="559.0" font-size="10.5" fill="#697280" text-anchor="start" font-weight="400">scheduled API connectors</text>
+<rect x="433.2" y="530" width="22.8" height="15" rx="7.5" fill="#1F6A62" opacity="0.14"/>
+<text x="444.6" y="541" font-size="9.5" fill="#1F6A62" text-anchor="middle" font-weight="700">P4</text>
+<rect x="520" y="144" width="128" height="220" rx="8" fill="#E8E8F6" stroke="#464A96" stroke-width="1.6"/>
+<rect x="520" y="144" width="4.5" height="220" rx="2" fill="#464A96"/>
+<text x="534" y="165" font-size="11.5" fill="#1C2024" text-anchor="start" font-weight="700">Kafka / Redpanda</text>
+<rect x="617.2" y="152" width="22.8" height="15" rx="7.5" fill="#464A96" opacity="0.14"/>
+<text x="628.6" y="163" font-size="9.5" fill="#464A96" text-anchor="middle" font-weight="700">P2</text>
+<rect x="534" y="206" width="100" height="18" rx="3.5" fill="#FFFFFF" stroke="#464A96" stroke-width="0.9" opacity="0.9"/>
+<text x="584" y="219" font-size="9.5" fill="#464A96" text-anchor="middle" font-weight="600">eth.blocks</text>
+<rect x="534" y="229" width="100" height="18" rx="3.5" fill="#FFFFFF" stroke="#464A96" stroke-width="0.9" opacity="0.9"/>
+<text x="584" y="242" font-size="9.5" fill="#464A96" text-anchor="middle" font-weight="600">eth.transactions</text>
+<rect x="534" y="252" width="100" height="18" rx="3.5" fill="#FFFFFF" stroke="#464A96" stroke-width="0.9" opacity="0.9"/>
+<text x="584" y="265" font-size="9.5" fill="#464A96" text-anchor="middle" font-weight="600">eth.logs</text>
+<rect x="534" y="275" width="100" height="18" rx="3.5" fill="#FFFFFF" stroke="#464A96" stroke-width="0.9" opacity="0.9"/>
+<text x="584" y="288" font-size="9.5" fill="#464A96" text-anchor="middle" font-weight="600">eth.traces</text>
+<rect x="534" y="298" width="100" height="18" rx="3.5" fill="#FFFFFF" stroke="#464A96" stroke-width="0.9" opacity="0.9"/>
+<text x="584" y="311" font-size="9.5" fill="#464A96" text-anchor="middle" font-weight="600">cdc.watchlists</text>
+<text x="584" y="339" font-size="9.5" fill="#464A96" text-anchor="middle" font-weight="700">Schema Registry · Avro</text>
+<text x="584" y="352" font-size="8.6" fill="#697280" text-anchor="middle" font-weight="400">backward-compatible evolution</text>
+<rect x="752" y="152" width="232" height="100" rx="8" fill="#F2E8DA" stroke="#8A6234" stroke-width="1.6"/>
+<rect x="752" y="152" width="4.5" height="100" rx="2" fill="#8A6234"/>
+<text x="766" y="173" font-size="13" fill="#1C2024" text-anchor="start" font-weight="700">BRONZE — raw</text>
+<text x="766" y="189.0" font-size="10.5" fill="#697280" text-anchor="start" font-weight="400">as-received, immutable</text>
+<text x="766" y="202.5" font-size="10.5" fill="#697280" text-anchor="start" font-weight="400">both paths land here</text>
+<text x="766" y="216.0" font-size="10.5" fill="#697280" text-anchor="start" font-weight="400">append-only · replayable</text>
+<rect x="940.4" y="160" width="35.6" height="15" rx="7.5" fill="#8A6234" opacity="0.14"/>
+<text x="958.2" y="171" font-size="9.5" fill="#8A6234" text-anchor="middle" font-weight="700">P1·2</text>
+<rect x="752" y="284" width="232" height="84" rx="8" fill="#FCE8DC" stroke="#B8400A" stroke-width="1.6"/>
+<rect x="752" y="284" width="4.5" height="84" rx="2" fill="#B8400A"/>
+<text x="766" y="305" font-size="13" fill="#1C2024" text-anchor="start" font-weight="700">Reorg &amp; reconciliation</text>
+<text x="766" y="321.0" font-size="10.5" fill="#697280" text-anchor="start" font-weight="400">orphaned blocks reversed</text>
+<text x="766" y="334.5" font-size="10.5" fill="#697280" text-anchor="start" font-weight="400">finality depth tracked</text>
+<text x="766" y="348.0" font-size="10.5" fill="#697280" text-anchor="start" font-weight="400">hot ↔ cold variance = 0</text>
+<rect x="953.2" y="292" width="22.8" height="15" rx="7.5" fill="#B8400A" opacity="0.14"/>
+<text x="964.6" y="303" font-size="9.5" fill="#B8400A" text-anchor="middle" font-weight="700">P3</text>
+<rect x="752" y="400" width="232" height="100" rx="8" fill="#EBEEF1" stroke="#5C6672" stroke-width="1.6"/>
+<rect x="752" y="400" width="4.5" height="100" rx="2" fill="#5C6672"/>
+<text x="766" y="421" font-size="13" fill="#1C2024" text-anchor="start" font-weight="700">SILVER — conformed</text>
+<text x="766" y="437.0" font-size="10.5" fill="#697280" text-anchor="start" font-weight="400">wei → decimal, token decimals</text>
+<text x="766" y="450.5" font-size="10.5" fill="#697280" text-anchor="start" font-weight="400">ERC-20 decoded from logs</text>
+<text x="766" y="464.0" font-size="10.5" fill="#697280" text-anchor="start" font-weight="400">contracts: traces merged in</text>
+<rect x="953.2" y="408" width="22.8" height="15" rx="7.5" fill="#5C6672" opacity="0.14"/>
+<text x="964.6" y="419" font-size="9.5" fill="#5C6672" text-anchor="middle" font-weight="700">P4</text>
+<rect x="752" y="532" width="232" height="132" rx="8" fill="#F6EFD5" stroke="#8C6D14" stroke-width="1.6"/>
+<rect x="752" y="532" width="4.5" height="132" rx="2" fill="#8C6D14"/>
+<text x="766" y="553" font-size="13" fill="#1C2024" text-anchor="start" font-weight="700">GOLD — dim / fct</text>
+<text x="766" y="569.0" font-size="10.5" fill="#697280" text-anchor="start" font-weight="400">dim_address  (SCD2 labels)</text>
+<text x="766" y="582.5" font-size="10.5" fill="#697280" text-anchor="start" font-weight="400">dim_token    (SCD2 metadata)</text>
+<text x="766" y="596.0" font-size="10.5" fill="#697280" text-anchor="start" font-weight="400">fct_transfer · fct_trace</text>
+<text x="766" y="609.5" font-size="10.5" fill="#697280" text-anchor="start" font-weight="400">as-of queries → audit-safe</text>
+<rect x="953.2" y="540" width="22.8" height="15" rx="7.5" fill="#8C6D14" opacity="0.14"/>
+<text x="964.6" y="551" font-size="9.5" fill="#8C6D14" text-anchor="middle" font-weight="700">P4</text>
+<rect x="1180" y="136" width="216" height="48" rx="8" fill="#EEE8F7" stroke="#5F4497" stroke-width="1.6"/>
+<rect x="1180" y="136" width="4.5" height="48" rx="2" fill="#5F4497"/>
+<text x="1194" y="164.5" font-size="12.5" fill="#1C2024" text-anchor="start" font-weight="700">Compliance analyst</text>
+<rect x="1056" y="208" width="452" height="66" rx="8" fill="#EEE8F7" stroke="#5F4497" stroke-width="1.6"/>
+<rect x="1056" y="208" width="4.5" height="66" rx="2" fill="#5F4497"/>
+<text x="1070" y="229" font-size="13" fill="#1C2024" text-anchor="start" font-weight="700">Guardrails — input &amp; output</text>
+<text x="1070" y="245.0" font-size="10.5" fill="#697280" text-anchor="start" font-weight="400">prompt-injection defence · PII redaction · scope limits · refusal on low evidence</text>
+<rect x="1477.2" y="216" width="22.8" height="15" rx="7.5" fill="#5F4497" opacity="0.14"/>
+<text x="1488.6" y="227" font-size="9.5" fill="#5F4497" text-anchor="middle" font-weight="700">P8</text>
+<rect x="1056" y="300" width="452" height="244" rx="8" fill="#EEE8F7" stroke="#5F4497" stroke-width="1.6"/>
+<rect x="1056" y="300" width="4.5" height="244" rx="2" fill="#5F4497"/>
+<text x="1070" y="322" font-size="13" fill="#1C2024" text-anchor="start" font-weight="700">LangGraph risk copilot</text>
+<rect x="1477.2" y="308" width="22.8" height="15" rx="7.5" fill="#5F4497" opacity="0.14"/>
+<text x="1488.6" y="319" font-size="9.5" fill="#5F4497" text-anchor="middle" font-weight="700">P7</text>
+<rect x="1072" y="338" width="204" height="72" rx="6" fill="#FFFFFF" stroke="#5F4497" stroke-width="1" opacity="0.95"/>
+<text x="1085" y="363" font-size="11.5" fill="#1C2024" text-anchor="start" font-weight="700">SQL tool</text>
+<text x="1085" y="381" font-size="9.8" fill="#697280" text-anchor="start" font-weight="400">governed reads on gold</text>
+<rect x="1288" y="338" width="204" height="72" rx="6" fill="#FFFFFF" stroke="#5F4497" stroke-width="1" opacity="0.95"/>
+<text x="1301" y="363" font-size="11.5" fill="#1C2024" text-anchor="start" font-weight="700">Graph traversal</text>
+<text x="1301" y="381" font-size="9.8" fill="#697280" text-anchor="start" font-weight="400">N-hop fund tracing</text>
+<rect x="1072" y="420" width="204" height="72" rx="6" fill="#FFFFFF" stroke="#5F4497" stroke-width="1" opacity="0.95"/>
+<text x="1085" y="445" font-size="11.5" fill="#1C2024" text-anchor="start" font-weight="700">RAG retriever</text>
+<text x="1085" y="463" font-size="9.8" fill="#697280" text-anchor="start" font-weight="400">AML policy &amp; typology docs</text>
+<rect x="1288" y="420" width="204" height="72" rx="6" fill="#FFFFFF" stroke="#5F4497" stroke-width="1" opacity="0.95"/>
+<text x="1301" y="445" font-size="11.5" fill="#1C2024" text-anchor="start" font-weight="700">Memory</text>
+<text x="1301" y="463" font-size="9.8" fill="#697280" text-anchor="start" font-weight="400">case state · prior findings</text>
+<text x="1070" y="527" font-size="10" fill="#5F4497" text-anchor="start" font-weight="600">output → risk score · exposure % · cited tx hashes · audit trail</text>
+<rect x="1056" y="576" width="452" height="64" rx="8" fill="#EEE8F7" stroke="#5F4497" stroke-width="1.6"/>
+<rect x="1056" y="576" width="4.5" height="64" rx="2" fill="#5F4497"/>
+<text x="1070" y="597" font-size="13" fill="#1C2024" text-anchor="start" font-weight="700">Evaluation &amp; cost</text>
+<text x="1070" y="613.0" font-size="10.5" fill="#697280" text-anchor="start" font-weight="400">golden set · groundedness · refusal rate · tokens &amp; $ per query</text>
+<rect x="1477.2" y="584" width="22.8" height="15" rx="7.5" fill="#5F4497" opacity="0.14"/>
+<text x="1488.6" y="595" font-size="9.5" fill="#5F4497" text-anchor="middle" font-weight="700">P8</text>
+<rect x="1056" y="672" width="452" height="64" rx="8" fill="#E7EEF4" stroke="#2F4F6B" stroke-width="1.6"/>
+<rect x="1056" y="672" width="4.5" height="64" rx="2" fill="#2F4F6B"/>
+<text x="1070" y="693" font-size="13" fill="#1C2024" text-anchor="start" font-weight="700">BI / dashboards</text>
+<text x="1070" y="709.0" font-size="10.5" fill="#697280" text-anchor="start" font-weight="400">exposure trends · alert volumes · pipeline freshness</text>
+<rect x="1477.2" y="680" width="22.8" height="15" rx="7.5" fill="#2F4F6B" opacity="0.14"/>
+<text x="1488.6" y="691" font-size="9.5" fill="#2F4F6B" text-anchor="middle" font-weight="700">P4</text>
+<polyline points="224,186 280,186" fill="none" stroke="#59616B" stroke-width="1.7" opacity="1.0" marker-end="url(#arrS)" stroke-linejoin="round"/>
+<polyline points="464,186 520,196" fill="none" stroke="#59616B" stroke-width="1.7" opacity="1.0" marker-end="url(#arrS)" stroke-linejoin="round"/>
+<text x="492" y="176" font-size="10" fill="#697280" text-anchor="middle" font-weight="600">Avro</text>
+<polyline points="224,286 280,286" fill="none" stroke="#59616B" stroke-width="1.7" opacity="1.0" marker-end="url(#arrS)" stroke-linejoin="round"/>
+<polyline points="464,286 520,292" fill="none" stroke="#59616B" stroke-width="1.7" opacity="1.0" marker-end="url(#arrS)" stroke-linejoin="round"/>
+<text x="492" y="276" font-size="10" fill="#697280" text-anchor="middle" font-weight="600">CDC</text>
+<polyline points="648,244 752,214" fill="none" stroke="#59616B" stroke-width="1.7" opacity="1.0" marker-end="url(#arrS)" stroke-linejoin="round"/>
+<text x="700" y="222" font-size="10" fill="#697280" text-anchor="middle" font-weight="600">stream sink</text>
+<polyline points="224,430 280,430" fill="none" stroke="#59616B" stroke-width="1.7" stroke-dasharray="6 4" opacity="1.0" marker-end="url(#arrB)" stroke-linejoin="round"/>
+<polyline points="464,430 684,430 684,238 752,238" fill="none" stroke="#59616B" stroke-width="1.7" stroke-dasharray="6 4" opacity="1.0" marker-end="url(#arrB)" stroke-linejoin="round"/>
+<text x="572" y="420" font-size="10" fill="#697280" text-anchor="middle" font-weight="600">nightly backfill</text>
+<polyline points="224,556 280,556" fill="none" stroke="#59616B" stroke-width="1.7" stroke-dasharray="6 4" opacity="1.0" marker-end="url(#arrB)" stroke-linejoin="round"/>
+<polyline points="464,556 712,556 712,470 752,470" fill="none" stroke="#59616B" stroke-width="1.7" stroke-dasharray="6 4" opacity="1.0" marker-end="url(#arrB)" stroke-linejoin="round"/>
+<text x="586" y="546" font-size="10" fill="#697280" text-anchor="middle" font-weight="600">reference &amp; label data</text>
+<polyline points="868,252 868,284" fill="none" stroke="#B8400A" stroke-width="2" opacity="1.0" marker-end="url(#arrS)" stroke-linejoin="round"/>
+<polyline points="868,368 868,400" fill="none" stroke="#B8400A" stroke-width="2" opacity="1.0" marker-end="url(#arrS)" stroke-linejoin="round"/>
+<text x="880" y="388" font-size="10" fill="#697280" text-anchor="start" font-weight="600">corrected</text>
+<polyline points="868,500 868,532" fill="none" stroke="#59616B" stroke-width="1.7" opacity="1.0" marker-end="url(#arrS)" stroke-linejoin="round"/>
+<text x="880" y="520" font-size="10" fill="#697280" text-anchor="start" font-weight="600">dbt</text>
+<polyline points="984,580 1020,580 1020,440 1056,440" fill="none" stroke="#59616B" stroke-width="1.7" opacity="1.0" marker-end="url(#arrS)" stroke-linejoin="round"/>
+<polyline points="984,640 1020,640 1020,700 1056,700" fill="none" stroke="#59616B" stroke-width="1.7" stroke-dasharray="6 4" opacity="1.0" marker-end="url(#arrB)" stroke-linejoin="round"/>
+<polyline points="1250,184 1250,208" fill="none" stroke="#59616B" stroke-width="1.7" opacity="1.0" marker-end="url(#arrS)" stroke-linejoin="round"/>
+<polyline points="1250,274 1250,300" fill="none" stroke="#59616B" stroke-width="1.7" opacity="1.0" marker-end="url(#arrS)" stroke-linejoin="round"/>
+<text x="1242" y="292" font-size="10" fill="#697280" text-anchor="end" font-weight="600">question</text>
+<polyline points="1326,300 1326,278" fill="none" stroke="#59616B" stroke-width="1.7" opacity="1.0" marker-end="url(#arrS)" stroke-linejoin="round"/>
+<polyline points="1326,208 1326,186" fill="none" stroke="#59616B" stroke-width="1.7" opacity="1.0" marker-end="url(#arrS)" stroke-linejoin="round"/>
+<text x="1334" y="292" font-size="10" fill="#697280" text-anchor="start" font-weight="600">cited answer</text>
+<polyline points="1130,544 1130,576" fill="none" stroke="#59616B" stroke-width="1.7" opacity="1.0" marker-end="url(#arrS)" stroke-linejoin="round"/>
+<polyline points="1508,544 1522,544 1522,782 244,782 244,286 228,286" fill="none" stroke="#8A6234" stroke-width="1.6" stroke-dasharray="6 4" opacity="0.95" marker-end="url(#arrB)" stroke-linejoin="round"/>
+<text x="640" y="774" font-size="10" fill="#697280" text-anchor="middle" font-weight="600">analyst labels &amp; watchlist updates  →  re-enter as CDC</text>
+<rect x="24" y="836" width="1512" height="188" rx="12" fill="#F4F2EF" stroke="#DAD6D0" stroke-width="1"/>
+<text x="40" y="860" font-size="10.5" fill="#697280" text-anchor="start" font-weight="700" letter-spacing="1.4">CROSS-CUTTING — PLATFORM, GOVERNANCE &amp; OPERATIONS</text>
+<rect x="40" y="876" width="282" height="62" rx="7" fill="#EFEDE9" stroke="#4A5058" stroke-width="1.1"/>
+<text x="53" y="900" font-size="11.8" fill="#1C2024" text-anchor="start" font-weight="700">Airflow orchestration</text>
+<text x="53" y="918" font-size="9.8" fill="#697280" text-anchor="start" font-weight="400">all DAGs · dbt runs · reconciliation</text>
+<rect x="282" y="886" width="32" height="15" rx="7.5" fill="#4A5058" opacity="0.13"/>
+<text x="298" y="897" font-size="9.2" fill="#4A5058" text-anchor="middle" font-weight="700">P1-6</text>
+<rect x="342" y="876" width="282" height="62" rx="7" fill="#EFEDE9" stroke="#4A5058" stroke-width="1.1"/>
+<text x="355" y="900" font-size="11.8" fill="#1C2024" text-anchor="start" font-weight="700">dbt</text>
+<text x="355" y="918" font-size="9.8" fill="#697280" text-anchor="start" font-weight="400">models · tests · contracts · docs</text>
+<rect x="584" y="886" width="32" height="15" rx="7.5" fill="#4A5058" opacity="0.13"/>
+<text x="600" y="897" font-size="9.2" fill="#4A5058" text-anchor="middle" font-weight="700">P4</text>
+<rect x="644" y="876" width="282" height="62" rx="7" fill="#EFEDE9" stroke="#4A5058" stroke-width="1.1"/>
+<text x="657" y="900" font-size="11.8" fill="#1C2024" text-anchor="start" font-weight="700">Great Expectations</text>
+<text x="657" y="918" font-size="9.8" fill="#697280" text-anchor="start" font-weight="400">profiling · completeness · freshness SLO</text>
+<rect x="886" y="886" width="32" height="15" rx="7.5" fill="#4A5058" opacity="0.13"/>
+<text x="902" y="897" font-size="9.2" fill="#4A5058" text-anchor="middle" font-weight="700">P6</text>
+<rect x="946" y="876" width="282" height="62" rx="7" fill="#EFEDE9" stroke="#4A5058" stroke-width="1.1"/>
+<text x="959" y="900" font-size="11.8" fill="#1C2024" text-anchor="start" font-weight="700">OpenLineage / Marquez</text>
+<text x="959" y="918" font-size="9.8" fill="#697280" text-anchor="start" font-weight="400">lineage + data catalog</text>
+<rect x="1188" y="886" width="32" height="15" rx="7.5" fill="#4A5058" opacity="0.13"/>
+<text x="1204" y="897" font-size="9.2" fill="#4A5058" text-anchor="middle" font-weight="700">P6</text>
+<rect x="1248" y="876" width="282" height="62" rx="7" fill="#EFEDE9" stroke="#4A5058" stroke-width="1.1"/>
+<text x="1261" y="900" font-size="11.8" fill="#1C2024" text-anchor="start" font-weight="700">Snowflake RBAC</text>
+<text x="1261" y="918" font-size="9.8" fill="#697280" text-anchor="start" font-weight="400">roles · row access · column masking</text>
+<rect x="1490" y="886" width="32" height="15" rx="7.5" fill="#4A5058" opacity="0.13"/>
+<text x="1506" y="897" font-size="9.2" fill="#4A5058" text-anchor="middle" font-weight="700">P6</text>
+<rect x="40" y="952" width="282" height="62" rx="7" fill="#EFEDE9" stroke="#4A5058" stroke-width="1.1"/>
+<text x="53" y="976" font-size="11.8" fill="#1C2024" text-anchor="start" font-weight="700">Docker Compose (local)</text>
+<text x="53" y="994" font-size="9.8" fill="#697280" text-anchor="start" font-weight="400">Redpanda · MinIO · Postgres · DuckDB</text>
+<rect x="282" y="962" width="32" height="15" rx="7.5" fill="#4A5058" opacity="0.13"/>
+<text x="298" y="973" font-size="9.2" fill="#4A5058" text-anchor="middle" font-weight="700">P0</text>
+<rect x="342" y="952" width="282" height="62" rx="7" fill="#EFEDE9" stroke="#4A5058" stroke-width="1.1"/>
+<text x="355" y="976" font-size="11.8" fill="#1C2024" text-anchor="start" font-weight="700">Terraform</text>
+<text x="355" y="994" font-size="9.8" fill="#697280" text-anchor="start" font-weight="400">AWS + Snowflake, dev / stg / prod</text>
+<rect x="584" y="962" width="32" height="15" rx="7.5" fill="#4A5058" opacity="0.13"/>
+<text x="600" y="973" font-size="9.2" fill="#4A5058" text-anchor="middle" font-weight="700">P0·9</text>
+<rect x="644" y="952" width="282" height="62" rx="7" fill="#EFEDE9" stroke="#4A5058" stroke-width="1.1"/>
+<text x="657" y="976" font-size="11.8" fill="#1C2024" text-anchor="start" font-weight="700">GitHub Actions</text>
+<text x="657" y="994" font-size="9.8" fill="#697280" text-anchor="start" font-weight="400">CI on PR · CD on merge · replay fixtures</text>
+<rect x="886" y="962" width="32" height="15" rx="7.5" fill="#4A5058" opacity="0.13"/>
+<text x="902" y="973" font-size="9.2" fill="#4A5058" text-anchor="middle" font-weight="700">P0·9</text>
+<rect x="946" y="952" width="282" height="62" rx="7" fill="#EFEDE9" stroke="#4A5058" stroke-width="1.1"/>
+<text x="959" y="976" font-size="11.8" fill="#1C2024" text-anchor="start" font-weight="700">Cost guardrails</text>
+<text x="959" y="994" font-size="9.8" fill="#697280" text-anchor="start" font-weight="400">budget alarms · auto-suspend · monitors</text>
+<rect x="1188" y="962" width="32" height="15" rx="7.5" fill="#4A5058" opacity="0.13"/>
+<text x="1204" y="973" font-size="9.2" fill="#4A5058" text-anchor="middle" font-weight="700">P0</text>
+<rect x="1248" y="952" width="282" height="62" rx="7" fill="#EFEDE9" stroke="#4A5058" stroke-width="1.1"/>
+<text x="1261" y="976" font-size="11.8" fill="#1C2024" text-anchor="start" font-weight="700">Observability</text>
+<text x="1261" y="994" font-size="9.8" fill="#697280" text-anchor="start" font-weight="400">pipeline SLOs · alerting · runbook · DR</text>
+<rect x="1490" y="962" width="32" height="15" rx="7.5" fill="#4A5058" opacity="0.13"/>
+<text x="1506" y="973" font-size="9.2" fill="#4A5058" text-anchor="middle" font-weight="700">P9</text>
+</svg>

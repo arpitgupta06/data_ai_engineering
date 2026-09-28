@@ -1,0 +1,8 @@
+# Every change needs review. Solo, this makes the reviewer explicit rather than
+# implied — and keeps the habit intact when someone else joins.
+
+*                       @cloudify4
+
+/docs/adr/              @cloudify4
+/projects/*/terraform/  @cloudify4
+/.github/workflows/     @cloudify4

@@ -1,0 +1,16 @@
+# Normalise to LF in the repo. This matters on Windows: a file with CRLF that is
+# bind-mounted into a Linux container will fail in ways that look unrelated
+# (shell scripts "not found", SQL init files silently skipped).
+* text=auto eol=lf
+
+*.sh   text eol=lf
+*.yml  text eol=lf
+*.yaml text eol=lf
+*.sql  text eol=lf
+*.py   text eol=lf
+
+# PowerShell is the exception — it wants CRLF.
+*.ps1  text eol=crlf
+
+*.png     binary
+*.parquet binary
