@@ -93,9 +93,13 @@ services:
 
   # ── Object storage: local S3 stand-in for bronze ───────────────
   minio:
-    # MinIO no longer publishes images to Docker Hub (minio/minio is 404 there).
-    # This is the final community release, still served from quay.io.
-    image: quay.io/minio/minio:RELEASE.2025-09-07T16-13-09Z
+    # MinIO community went EOL (repo archived Apr 2026); minio/minio stopped
+    # serving anonymous pulls on both Docker Hub and quay.io, which now hosts
+    # only the commercial AIStor image. Chainguard builds MinIO from source and
+    # serves it free, but publishes only :latest — so we pin by digest.
+    # Caveat: Chainguard's free tier may garbage-collect old digests. If a fresh
+    # clone fails to pull, refresh the pin. See ADR 0005.
+    image: cgr.dev/chainguard/minio@sha256:4692462f35d97d7e82c30371d82f057703c5d9489bcae726010594c812f2d285
     container_name: chainrisk-minio
     command: server /data --console-address ":9001"
     environment:
@@ -107,7 +111,17 @@ services:
     volumes:
       - minio-data:/data
     healthcheck:
-      test: ["CMD", "curl", "-fsS", "http://localhost:9000/minio/health/live"]
+      # Neither curl nor grep exist in this image (distroless), and `mc ping`
+      # needs an admin client/alias we haven't set up here — so hit the health
+      # endpoint over bash's /dev/tcp (sh is a bash symlink in this image)
+      # and match the status line with a case pattern instead of grep.
+      test:
+        - CMD-SHELL
+        - |
+          exec 3<>/dev/tcp/127.0.0.1/9000
+          printf 'GET /minio/health/live HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n' >&3
+          read -r line <&3
+          case "$$line" in *" 200 "*) exit 0 ;; *) exit 1 ;; esac
       interval: 10s
       timeout: 5s
       retries: 10
@@ -115,7 +129,10 @@ services:
     restart: unless-stopped
 
   minio-init:
-    image: quay.io/minio/mc:RELEASE.2025-08-13T08-35-41Z
+    # Chainguard's minio-client is distroless: no shell, ENTRYPOINT is mc itself.
+    # MC_HOST_<alias> replaces `mc alias set`, and `mc mb` takes several targets,
+    # so the whole bootstrap is one command and needs no shell.
+    image: cgr.dev/chainguard/minio-client@sha256:ad8dcbf569b9ae56536c3cfd23b850cb05b42fd6aae22767ae66acbcf161a224
     container_name: chainrisk-minio-init
     # One-shot. Waiting for *healthy*, not merely *started*: a started MinIO can
     # still refuse connections, which makes this race and fail only sometimes.
@@ -123,19 +140,8 @@ services:
       minio:
         condition: service_healthy
     environment:
-      MINIO_ROOT_USER: ${MINIO_ROOT_USER:?set MINIO_ROOT_USER in infra/.env}
-      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:?set MINIO_ROOT_PASSWORD in infra/.env}
-    entrypoint: ["/bin/sh", "-c"]
-    # Idempotent: --ignore-existing makes re-running `up` a no-op, not an error.
-    # $$ defers expansion to the container shell, so secrets stay out of the
-    # rendered compose config.
-    command:
-      - |
-        set -e
-        mc alias set local http://minio:9000 "$$MINIO_ROOT_USER" "$$MINIO_ROOT_PASSWORD"
-        mc mb --ignore-existing local/chainrisk-bronze
-        mc mb --ignore-existing local/chainrisk-artifacts
-        mc ls local
+      MC_HOST_local: http://${MINIO_ROOT_USER:?set MINIO_ROOT_USER in infra/.env}:${MINIO_ROOT_PASSWORD:?set MINIO_ROOT_PASSWORD in infra/.env}@minio:9000
+    command: ["mb", "--ignore-existing", "local/chainrisk-bronze", "local/chainrisk-artifacts"]
     restart: "no"
 
   # ── Operational Postgres: watchlists, alert rules, annotations ─

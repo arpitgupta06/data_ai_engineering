@@ -39,6 +39,7 @@ that cost more than half a day, or changed the design, gets an entry.
 |---|---|---|---|---|
 | [CH-001](CH-001-dataset-is-not-real-time.md) | The "real-time" dataset is a nightly batch drop | Design | streaming, requirements | Mitigated |
 | [CH-002](CH-002-cdc-scd-on-immutable-data.md) | CDC and SCD had nowhere honest to live | Design | modeling, governance | Resolved |
+| [CH-003](CH-003-minio-eol-registry-lockout.md) | A core dependency went EOL mid-sprint and locked us out of its images | 0 | ops, security, cost | Resolved |
 
 **Status:** `Open` (live problem) · `Mitigated` (working around it, residual risk)
 · `Resolved` (closed, outcome observed)
