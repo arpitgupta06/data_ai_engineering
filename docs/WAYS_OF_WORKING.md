@@ -61,11 +61,19 @@ spike/CRC-22-rpc-provider-comparison       timeboxed investigation, throwaway
 Rules:
 
 - Branch from the latest `main`, always. Never branch from a branch.
-- One subtask, one branch, one PR. Lifetime target: **under 2 days**.
+- **One story, one branch, one PR.** Subtasks are a checklist inside the story,
+  not separate branches. Lifetime target: **under a week**; split the story if
+  it runs longer.
 - Rebase on `main` before opening the PR — keep history linear.
 - Delete the branch on merge.
 - Never commit directly to `main`. The one exception is the initial bootstrap
   commit, which predates this document.
+
+> Revised at Sprint 2 planning (2026-10-03). The original rule was one branch per
+> *subtask*. Sprint 1 produced a single branch carrying five subtasks, because the
+> subtasks were edits to one file and splitting them would have been theatre. The
+> rule was changed to match how the work actually divides, rather than left to be
+> quietly ignored — a process nobody follows is worse than a looser one everybody does.
 
 ## 5. Commits — Conventional Commits + Jira key
 
