@@ -39,10 +39,17 @@ select = ["E", "F", "I", "UP", "B", "SIM", "C4", "PTH"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+# scripts/smoke_test.py matches pytest's default *_test.py; it is a script, not a test.
+python_files = ["test_*.py"]
 addopts = "-q --strict-markers"
 markers = ["integration: requires the local stack to be running"]
 
 [tool.mypy]
 python_version = "3.12"
 strict = true
-files = ["src"]
+files = ["src", "scripts", "tests"]
+plugins = ["pydantic.mypy"]
+
+[[tool.mypy.overrides]]
+module = ["boto3", "botocore.*"]
+ignore_missing_imports = true
