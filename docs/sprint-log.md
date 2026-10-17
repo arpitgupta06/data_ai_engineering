@@ -20,3 +20,14 @@ proven by bucket directory mtimes, not by `mc` output, which reports "created"
 either way.
 Next: commit CRC-6, reconcile the board, Sunday retro.
 
+## Sprint 2 — week of 2026-10-05
+
+**2026-10-05 → 10-09** — CRC-13 done: typed settings module, five-service
+end-to-end smoke test, 15 unit tests. Three review rounds, because the first two
+attempts to verify the *failure* path produced no usable evidence — one run was
+interrupted, one was timed with a stale stopwatch. Verified both ways in the end:
+5/5 against a healthy stack, exit 1 with five named failures against a stopped
+one, 12.76s. Three defects found that the passing path never showed. Logged as
+CH-004.
+Next: CRC-14 (Makefile + dev.ps1), then the clean-clone proof.
+
