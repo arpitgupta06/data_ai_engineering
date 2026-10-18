@@ -41,6 +41,7 @@ function Invoke-Step {
 # `@(,x)` keeps a single step from being flattened into a plain string array.
 $LintSteps = @(@('ruff', 'check', '.'), @('ruff', 'format', '--check', '.'), @('mypy'))
 $TestSteps = @(, @('pytest'))
+$FmtSteps  = @(@('ruff', 'format', '.'), @('ruff', 'check', '--fix', '.'))
 
 function Invoke-Steps {
     param([object[]]$Steps)
@@ -95,10 +96,7 @@ switch ($Target) {
         Invoke-Compose $a
     }
     'smoke' { Invoke-Step 'uv' @('run', 'python', 'scripts/smoke_test.py') }
-    'fmt'   {
-        Invoke-Step 'uv' @('run', 'ruff', 'format', '.')
-        Invoke-Step 'uv' @('run', 'ruff', 'check', '--fix', '.')
-    }
+    'fmt'   { Invoke-Steps $FmtSteps }
     'lint'  { Invoke-Steps $LintSteps }
     'test'  { Invoke-Steps $TestSteps }
     'verify' { Invoke-Steps ($LintSteps + $TestSteps) }

@@ -60,6 +60,7 @@ def test_clean_is_the_only_target_documented_as_destructive() -> None:
 
 def test_verify_is_composed_from_lint_and_test_in_both_entrypoints() -> None:
     assert re.search(r"^verify: lint test ##", MAKEFILE, re.MULTILINE)
-    assert "'verify' { Invoke-Steps ($LintSteps + $TestSteps) }" in DEV_PS1
-    assert "'lint'  { Invoke-Steps $LintSteps }" in DEV_PS1
-    assert "'test'  { Invoke-Steps $TestSteps }" in DEV_PS1
+    assert re.search(r"'verify'\s*\{\s*Invoke-Steps \(\$LintSteps \+ \$TestSteps\)", DEV_PS1)
+    assert re.search(r"'lint'\s*\{\s*Invoke-Steps \$LintSteps\s*\}", DEV_PS1)
+    assert re.search(r"'test'\s*\{\s*Invoke-Steps \$TestSteps\s*\}", DEV_PS1)
+    assert re.search(r"'fmt'\s*\{\s*Invoke-Steps \$FmtSteps\s*\}", DEV_PS1)
