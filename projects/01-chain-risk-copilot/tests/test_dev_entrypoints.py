@@ -7,6 +7,8 @@ REPO_ROOT = Path(__file__).resolve().parents[3]
 MAKEFILE = (REPO_ROOT / "Makefile").read_text(encoding="utf-8")
 DEV_PS1 = (REPO_ROOT / "dev.ps1").read_text(encoding="utf-8")
 
+# Deliberately hardcoded, not derived from the Makefile: adding a target means editing the
+# Makefile, dev.ps1 and this set, so it cannot happen by accident. Do not "simplify" it away.
 EXPECTED = {
     "help", "setup", "up", "down", "ps", "logs", "smoke", "fmt", "lint", "test", "verify", "clean",
 }  # fmt: skip
@@ -50,6 +52,14 @@ def test_clean_is_the_only_target_documented_as_destructive() -> None:
     destructive = {t for t, d in make_descriptions().items() if "DESTROYS DATA" in d}
     assert destructive == {"clean"}
     assert {t for t, d in ps1_help().items() if "DESTROYS DATA" in d} == {"clean"}
-    # `down -v` is what wipes volumes; no other recipe or PowerShell branch may use it.
-    assert len(re.findall(r"down -v", MAKEFILE)) == 2  # comment-free: help text + recipe
+    # `down -v` wipes volumes: only the clean recipe / branch may run it.
+    recipes = [ln for ln in MAKEFILE.splitlines() if ln.startswith("	") and "down -v" in ln]
+    assert recipes == ["	$(RUN) $(COMPOSE) down -v"]
     assert len(re.findall(r"'down', '-v'", DEV_PS1)) == 1
+
+
+def test_verify_is_composed_from_lint_and_test_in_both_entrypoints() -> None:
+    assert re.search(r"^verify: lint test ##", MAKEFILE, re.MULTILINE)
+    assert "'verify' { Invoke-Steps ($LintSteps + $TestSteps) }" in DEV_PS1
+    assert "'lint'  { Invoke-Steps $LintSteps }" in DEV_PS1
+    assert "'test'  { Invoke-Steps $TestSteps }" in DEV_PS1

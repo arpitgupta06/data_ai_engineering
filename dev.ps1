@@ -25,12 +25,26 @@ function Invoke-Step {
     try {
         # Native tools (docker) write progress to stderr; with 'Stop', PS 5.1 turns that into an
         # error whenever the caller redirects it. Exit codes are checked explicitly below.
+        # Resolve first so a missing tool throws regardless of the preference; otherwise
+        # LASTEXITCODE stays 0 and the step would "pass" having run nothing.
+        $resolved = (Get-Command $Exe -CommandType Application -ErrorAction Stop | Select-Object -First 1).Source
         $ErrorActionPreference = 'Continue'
-        $global:LASTEXITCODE = 0
-        & $Exe @Arguments
+        $global:LASTEXITCODE = $null
+        & $resolved @Arguments
+        # $null means the process never ran (no exit code was set): fail, never pass.
         if ($LASTEXITCODE -ne 0) { throw "'$Exe $($Arguments -join ' ')' failed with exit code $LASTEXITCODE" }
     }
     finally { Pop-Location }
+}
+
+# One definition of each step list, so `verify` can never drift from `lint` and `test`.
+# `@(,x)` keeps a single step from being flattened into a plain string array.
+$LintSteps = @(@('ruff', 'check', '.'), @('ruff', 'format', '--check', '.'), @('mypy'))
+$TestSteps = @(, @('pytest'))
+
+function Invoke-Steps {
+    param([object[]]$Steps)
+    foreach ($s in $Steps) { Invoke-Step 'uv' (@('run') + $s) }
 }
 
 function Invoke-Compose {
@@ -85,17 +99,8 @@ switch ($Target) {
         Invoke-Step 'uv' @('run', 'ruff', 'format', '.')
         Invoke-Step 'uv' @('run', 'ruff', 'check', '--fix', '.')
     }
-    'lint'  {
-        Invoke-Step 'uv' @('run', 'ruff', 'check', '.')
-        Invoke-Step 'uv' @('run', 'ruff', 'format', '--check', '.')
-        Invoke-Step 'uv' @('run', 'mypy')
-    }
-    'test'  { Invoke-Step 'uv' @('run', 'pytest') }
-    'verify' {
-        Invoke-Step 'uv' @('run', 'ruff', 'check', '.')
-        Invoke-Step 'uv' @('run', 'ruff', 'format', '--check', '.')
-        Invoke-Step 'uv' @('run', 'mypy')
-        Invoke-Step 'uv' @('run', 'pytest')
-    }
+    'lint'  { Invoke-Steps $LintSteps }
+    'test'  { Invoke-Steps $TestSteps }
+    'verify' { Invoke-Steps ($LintSteps + $TestSteps) }
     'clean' { Invoke-Compose @('down', '-v') }
 }
