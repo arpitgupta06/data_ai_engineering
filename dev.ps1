@@ -7,7 +7,7 @@
 #>
 param(
     [Parameter(Position = 0)]
-    [ValidateSet('help', 'setup', 'up', 'down', 'ps', 'logs', 'smoke', 'fmt', 'lint', 'test', 'clean')]
+    [ValidateSet('help', 'setup', 'up', 'down', 'ps', 'logs', 'smoke', 'fmt', 'lint', 'test', 'verify', 'clean')]
     [string]$Target = 'help',
 
     # logs only: limit to one service, e.g. `.\dev.ps1 logs redpanda`
@@ -23,6 +23,10 @@ function Invoke-Step {
     param([string]$Exe, [string[]]$Arguments)
     Push-Location $ProjectDir
     try {
+        # Native tools (docker) write progress to stderr; with 'Stop', PS 5.1 turns that into an
+        # error whenever the caller redirects it. Exit codes are checked explicitly below.
+        $ErrorActionPreference = 'Continue'
+        $global:LASTEXITCODE = 0
         & $Exe @Arguments
         if ($LASTEXITCODE -ne 0) { throw "'$Exe $($Arguments -join ' ')' failed with exit code $LASTEXITCODE" }
     }
@@ -47,6 +51,7 @@ switch ($Target) {
   fmt      Format and auto-fix with ruff
   lint     ruff check, ruff format --check, mypy
   test     Unit tests (no running stack needed)
+  verify   lint + test: the pre-push check
   clean    DESTROYS DATA: stop the stack and delete its volumes (down -v)
 '@
     }
@@ -86,5 +91,11 @@ switch ($Target) {
         Invoke-Step 'uv' @('run', 'mypy')
     }
     'test'  { Invoke-Step 'uv' @('run', 'pytest') }
+    'verify' {
+        Invoke-Step 'uv' @('run', 'ruff', 'check', '.')
+        Invoke-Step 'uv' @('run', 'ruff', 'format', '--check', '.')
+        Invoke-Step 'uv' @('run', 'mypy')
+        Invoke-Step 'uv' @('run', 'pytest')
+    }
     'clean' { Invoke-Compose @('down', '-v') }
 }

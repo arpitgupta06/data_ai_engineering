@@ -9,10 +9,10 @@ RUN     := cd $(PROJECT) &&
 LONG_RUNNING := redpanda redpanda-console minio postgres-ops
 
 .DEFAULT_GOAL := help
-.PHONY: help setup up down ps logs smoke fmt lint test clean
+.PHONY: help setup up down ps logs smoke fmt lint test verify clean
 
 help: ## List the targets
-	@grep -E '^[a-z]+:.*## ' $(MAKEFILE_LIST) | awk -F':.*## ' '{printf "  %-8s %s\n", $$1, $$2}'
+	@grep -E '^[a-z][a-z-]*:.*## ' $(MAKEFILE_LIST) | awk -F':.*## ' '{printf "  %-8s %s\n", $$1, $$2}'
 
 setup: ## Create infra/.env if absent, uv sync --all-groups, install pre-commit hooks
 	@$(RUN) if [ -f infra/.env ]; then echo "infra/.env exists - left untouched"; \
@@ -49,6 +49,8 @@ lint: ## ruff check, ruff format --check, mypy
 
 test: ## Unit tests (no running stack needed)
 	$(RUN) uv run pytest
+
+verify: lint test ## lint + test: the pre-push check
 
 clean: ## DESTROYS DATA: stop the stack and delete its volumes (down -v)
 	$(RUN) $(COMPOSE) down -v
