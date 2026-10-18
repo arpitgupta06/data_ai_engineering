@@ -45,3 +45,4 @@ logs/
 !.vscode/extensions.json
 .DS_Store
 Thumbs.db
+data-engineering.code-workspace
