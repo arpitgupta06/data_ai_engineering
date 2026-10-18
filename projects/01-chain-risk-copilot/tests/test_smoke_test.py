@@ -187,6 +187,7 @@ def patch_registry(
         "get",
         lambda *a, **k: FakeResponse({"schema": returned_schema or registered}),
     )
+
     def fake_delete(url: str, **_k: object) -> FakeResponse:
         deletes.append(url)
         return FakeResponse({})
