@@ -8,6 +8,7 @@ dependencies = [
     "confluent-kafka>=2.6",
     "duckdb>=1.1",
     "psycopg[binary]>=3.2",
+    "pyarrow>=17",
     "pydantic>=2.9",
     "pydantic-settings>=2.6",
     "requests>=2.32",
@@ -54,5 +55,5 @@ files = ["src", "scripts", "tests"]
 plugins = ["pydantic.mypy"]
 
 [[tool.mypy.overrides]]
-module = ["boto3", "botocore.*"]
+module = ["boto3", "botocore.*", "pyarrow", "pyarrow.*"]
 ignore_missing_imports = true

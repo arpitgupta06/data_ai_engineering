@@ -69,6 +69,15 @@ class Settings(BaseSettings):
         return f"http://{self.minio_host}:{self.minio_port}"
 
     @property
+    def s3_endpoint_host_port(self) -> str:
+        """Host:port form, without scheme: what pyarrow's S3FileSystem wants.
+
+        boto3 takes the full URL (``s3_endpoint_url``); pyarrow takes a connect string
+        plus a separate ``scheme``. Two libraries, two formats, one MinIO.
+        """
+        return f"{self.minio_host}:{self.minio_port}"
+
+    @property
     def postgres_ops_dsn(self) -> str:
         """libpq URI usable by psycopg. User and password are percent-encoded."""
         user = quote(self.postgres_ops_user, safe="")

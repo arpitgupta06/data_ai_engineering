@@ -30,4 +30,3 @@ interrupted, one was timed with a stale stopwatch. Verified both ways in the end
 one, 12.76s. Three defects found that the passing path never showed. Logged as
 CH-004.
 Next: CRC-14 (Makefile + dev.ps1), then the clean-clone proof.
-

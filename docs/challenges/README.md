@@ -41,6 +41,7 @@ that cost more than half a day, or changed the design, gets an entry.
 | [CH-002](CH-002-cdc-scd-on-immutable-data.md) | CDC and SCD had nowhere honest to live | Design | modeling, governance | Resolved |
 | [CH-003](CH-003-minio-eol-registry-lockout.md) | A core dependency went EOL mid-sprint and locked us out of its images | 0 | ops, security, cost | Resolved |
 | [CH-004](CH-004-a-smoke-test-that-only-ever-passed.md) | A smoke test that had only ever been seen to pass | 0 | data-quality, ops | Resolved |
+| [CH-005](CH-005-truncate-before-write.md) | A script truncated an untracked file before it wrote | 1 | ops | Mitigated |
 
 **Status:** `Open` (live problem) · `Mitigated` (working around it, residual risk)
 · `Resolved` (closed, outcome observed)
