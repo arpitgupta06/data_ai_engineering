@@ -4,12 +4,22 @@ Columns are pruned at ingest (ADR 0006): bronze holds what silver needs, not the
 source bytes. The source is free and replayable, so a dropped column is one re-run away.
 """
 
+import contextlib
 from collections.abc import Collection, Sequence
 from datetime import UTC, date, datetime, timedelta
 from enum import StrEnum
 from typing import NamedTuple
 
-from pyarrow.fs import FileSystem, FileType, S3FileSystem
+import pyarrow as pa
+import pyarrow.parquet as pq
+from pyarrow.fs import (
+    FileInfo,
+    FileSelector,
+    FileSystem,
+    FileType,
+    LocalFileSystem,
+    S3FileSystem,
+)
 from pydantic import (
     AwareDatetime,
     BaseModel,
@@ -251,3 +261,152 @@ def assess_partition(
 
 def utc_now() -> datetime:
     return datetime.now(UTC)
+
+
+# ── Ingesting one partition ──────────────────────────────────────────────────────────
+#
+# Memory: the largest source file (transactions) is ~838 MB. Each file is streamed with
+# iter_batches(columns=...) straight into a ParquetWriter on an output stream, rather than
+# read_table(), which would materialise the whole pruned file at once. The floor is one
+# row group of pruned columns in Arrow memory, not one batch: iter_batches decompresses a
+# whole row group and slices batches out of it, so BATCH_ROWS is not the memory dial.
+# The real peak is to be measured on the first full run, not estimated here.
+
+BATCH_ROWS = 131_072
+
+
+class IngestError(Exception):
+    """A partition failed. The message names the table and date."""
+
+
+class SourcePartitionMissingError(IngestError):
+    pass
+
+
+class RowCountMismatchError(IngestError):
+    pass
+
+
+class Outcome(StrEnum):
+    INGESTED = "ingested"
+    SKIPPED = "skipped"
+
+
+class PartitionResult(NamedTuple):
+    table: str
+    day: date
+    outcome: Outcome
+    rows: int
+    detail: str
+
+
+def source_files(fs: FileSystem, table: str, day: date) -> list[FileInfo]:
+    prefix = f"{SOURCE_BUCKET}/{SOURCE_PREFIX}/{table}/date={day.isoformat()}"
+    # Recursive, so a file nested below date=... is still found; the .parquet filter below
+    # decides what is picked up. allow_not_found turns a missing prefix into an empty list.
+    infos = fs.get_file_info(FileSelector(prefix, recursive=True, allow_not_found=True))
+    files = sorted(
+        (i for i in infos if i.type == FileType.File and i.path.endswith(".parquet")),
+        key=lambda i: i.path,
+    )
+    if not files:
+        raise SourcePartitionMissingError(f"{table} {day}: no parquet files under {prefix}")
+    return files
+
+
+def _ensure_dir(fs: FileSystem, path: str) -> None:
+    # A local filesystem will not create parents on write. S3 has no directories, and
+    # create_dir there would leave empty "dir/" marker objects, so skip it.
+    if isinstance(fs, LocalFileSystem):
+        fs.create_dir(path, recursive=True)
+
+
+def _copy_pruned(
+    src_fs: FileSystem, dst_fs: FileSystem, source_path: str, dest_path: str, table: str
+) -> tuple[int, int, int]:
+    """Stream one file, keeping only COLUMNS[table].
+
+    Returns (rows in the source footer, rows streamed, rows in the written footer). The
+    three come from independent places, so agreement is evidence and not a tautology.
+    """
+    columns = list(COLUMNS[table])
+    with src_fs.open_input_file(source_path) as handle:
+        parquet = pq.ParquetFile(handle)
+        check_columns(table, parquet.schema_arrow.names)
+        expected = parquet.metadata.num_rows
+        schema = pa.schema([parquet.schema_arrow.field(c) for c in columns])
+        streamed = 0
+        with (
+            dst_fs.open_output_stream(dest_path) as out,
+            # Explicit, not the library default: ADR-0006 lists compression among the
+            # things rewriting changes, so it should not shift under a pyarrow upgrade.
+            pq.ParquetWriter(out, schema, compression="snappy") as writer,
+        ):
+            for batch in parquet.iter_batches(batch_size=BATCH_ROWS, columns=columns):
+                writer.write_batch(batch)
+                streamed += batch.num_rows
+    with dst_fs.open_input_file(dest_path) as written:
+        written_rows = pq.ParquetFile(written).metadata.num_rows
+    return expected, streamed, written_rows
+
+
+def ingest_partition(
+    src_fs: FileSystem, dst_fs: FileSystem, root: str, table: str, day: date
+) -> PartitionResult:
+    """Ingest one table-day into bronze. Raises IngestError subclasses on failure.
+
+    A partition is complete only once _SUCCESS exists. Re-running a current partition is
+    a no-op; a stale one (columns widened, or AWS re-delivered) is re-ingested.
+    """
+    files = source_files(src_fs, table, day)
+    source_last_modified = max(f.mtime for f in files)
+
+    path = marker_path(root, table, day)
+    existing = read_marker(dst_fs, path)
+    assessment = assess_partition(existing, COLUMNS[table], source_last_modified)
+    if existing is not None and assessment.state is PartitionState.CURRENT:
+        return PartitionResult(table, day, Outcome.SKIPPED, existing.rows, assessment.reason)
+
+    directory = partition_dir(root, table, day)
+    # Marker first: once it is gone the partition is absent to every reader, so cleaning
+    # and rewriting the data objects below cannot expose a half-built partition.
+    delete_marker(dst_fs, path)
+    dst_fs.delete_dir_contents(directory, missing_dir_ok=True)
+    _ensure_dir(dst_fs, directory)
+
+    total = 0
+    try:
+        for index, source in enumerate(files):
+            dest = f"{directory}/part-{index:05d}.parquet"
+            expected, streamed, written = _copy_pruned(src_fs, dst_fs, source.path, dest, table)
+            if not expected == streamed == written:
+                raise RowCountMismatchError(
+                    f"{table} {day}: {source.base_name}: source has {expected} rows, "
+                    f"streamed {streamed}, wrote {written}"
+                )
+            total += written
+    except Exception:
+        # Best-effort tidy. Correctness does not depend on it: with no marker the
+        # partition is absent, and the next run clears leftovers before writing. That is
+        # also why Exception and not BaseException: Ctrl-C leaves data but no marker, which
+        # reads as absent, by design.
+        with contextlib.suppress(OSError):
+            dst_fs.delete_dir_contents(directory, missing_dir_ok=True)
+        raise
+
+    write_marker(
+        dst_fs,
+        path,
+        Marker(
+            table=table,
+            date=day,
+            rows=total,
+            source_last_modified=source_last_modified,
+            source_files=len(files),
+            source_bytes=sum(f.size for f in files),
+            columns=list(COLUMNS[table]),
+            ingested_at=utc_now(),
+        ),
+    )
+    reason = assessment.reason if existing is not None else "new partition"
+    return PartitionResult(table, day, Outcome.INGESTED, total, reason)
