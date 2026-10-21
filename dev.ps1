@@ -7,7 +7,7 @@
 #>
 param(
     [Parameter(Position = 0)]
-    [ValidateSet('help', 'setup', 'up', 'down', 'ps', 'logs', 'smoke', 'fmt', 'lint', 'test', 'verify', 'clean')]
+    [ValidateSet('help', 'setup', 'up', 'down', 'ps', 'logs', 'smoke', 'ingest', 'fmt', 'lint', 'test', 'verify', 'clean')]
     [string]$Target = 'help',
 
     # logs only: limit to one service, e.g. `.\dev.ps1 logs redpanda`
@@ -63,6 +63,7 @@ switch ($Target) {
   ps       Show service status
   logs     Follow logs (all services, or: .\dev.ps1 logs redpanda)
   smoke    Run the end-to-end smoke test against the running stack
+  ingest   Ingest the 7-day window into bronze (needs the stack up)
   fmt      Format and auto-fix with ruff
   lint     ruff check, ruff format --check, mypy
   test     Unit tests (no running stack needed)
@@ -96,6 +97,7 @@ switch ($Target) {
         Invoke-Compose $a
     }
     'smoke' { Invoke-Step 'uv' @('run', 'python', 'scripts/smoke_test.py') }
+    'ingest' { Invoke-Step 'uv' @('run', 'python', '-m', 'chainrisk.ingest.bronze') }
     'fmt'   { Invoke-Steps $FmtSteps }
     'lint'  { Invoke-Steps $LintSteps }
     'test'  { Invoke-Steps $TestSteps }

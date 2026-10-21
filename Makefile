@@ -9,7 +9,7 @@ RUN     := cd $(PROJECT) &&
 LONG_RUNNING := redpanda redpanda-console minio postgres-ops
 
 .DEFAULT_GOAL := help
-.PHONY: help setup up down ps logs smoke fmt lint test verify clean
+.PHONY: help setup up down ps logs smoke ingest fmt lint test verify clean
 
 help: ## List the targets
 	@grep -E '^[a-z][a-z-]*:.*## ' $(MAKEFILE_LIST) | awk -F':.*## ' '{printf "  %-8s %s\n", $$1, $$2}'
@@ -37,6 +37,9 @@ logs: ## Follow logs (all services, or SERVICE=redpanda)
 
 smoke: ## Run the end-to-end smoke test against the running stack
 	$(RUN) uv run python scripts/smoke_test.py
+
+ingest: ## Ingest the 7-day window into bronze (needs the stack up)
+	$(RUN) uv run python -m chainrisk.ingest.bronze
 
 fmt: ## Format and auto-fix with ruff
 	$(RUN) uv run ruff format .

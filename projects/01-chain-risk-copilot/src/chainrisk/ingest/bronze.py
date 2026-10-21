@@ -5,7 +5,8 @@ source bytes. The source is free and replayable, so a dropped column is one re-r
 """
 
 import contextlib
-from collections.abc import Collection, Sequence
+import sys
+from collections.abc import Callable, Collection, Sequence
 from datetime import UTC, date, datetime, timedelta
 from enum import StrEnum
 from typing import NamedTuple
@@ -29,7 +30,7 @@ from pydantic import (
     ValidationError,
 )
 
-from chainrisk.settings import Settings
+from chainrisk.settings import Settings, get_settings
 
 SOURCE_BUCKET = "aws-public-blockchain"
 SOURCE_REGION = "us-east-2"
@@ -290,6 +291,7 @@ class RowCountMismatchError(IngestError):
 class Outcome(StrEnum):
     INGESTED = "ingested"
     SKIPPED = "skipped"
+    FAILED = "failed"
 
 
 class PartitionResult(NamedTuple):
@@ -410,3 +412,90 @@ def ingest_partition(
     )
     reason = assessment.reason if existing is not None else "new partition"
     return PartitionResult(table, day, Outcome.INGESTED, total, reason)
+
+
+# ── Running the window ───────────────────────────────────────────────────────────────
+
+
+def run_window(
+    src_fs: FileSystem,
+    dst_fs: FileSystem,
+    root: str,
+    days: Sequence[date],
+    tables: Sequence[str] = TABLES,
+    on_start: Callable[[str, date], None] | None = None,
+    on_result: Callable[[PartitionResult], None] | None = None,
+) -> list[PartitionResult]:
+    """Ingest every table-day, recording each outcome. One bad partition never stops the rest.
+
+    Any Exception counts as that partition failing, not only IngestError: a corrupt marker,
+    schema drift (ValueError) or a dropped connection (OSError) all belong to one table-day.
+    KeyboardInterrupt still propagates, so Ctrl-C stops the run.
+    """
+    results: list[PartitionResult] = []
+    for day in days:
+        for table in tables:
+            if on_start:
+                on_start(table, day)
+            try:
+                result = ingest_partition(src_fs, dst_fs, root, table, day)
+            except Exception as exc:
+                result = PartitionResult(
+                    table, day, Outcome.FAILED, 0, f"{type(exc).__name__}: {exc}"
+                )
+            results.append(result)
+            if on_result:
+                on_result(result)
+    return results
+
+
+def format_result(result: PartitionResult) -> str:
+    label = {Outcome.INGESTED: "ok", Outcome.SKIPPED: "skip", Outcome.FAILED: "FAIL"}
+    head = f"[{label[result.outcome]:<4}] {result.table:<16} {result.day}"
+    if result.outcome is Outcome.FAILED:
+        return f"{head}  {result.detail}"
+    return f"{head}  {result.outcome.value} {result.rows:,} rows ({result.detail})"
+
+
+def exit_code(results: Sequence[PartitionResult]) -> int:
+    return 1 if any(r.outcome is Outcome.FAILED for r in results) else 0
+
+
+def main() -> int:
+    """Ingest the fixed window for every table. Exit 0 if all passed, 1 if any partition
+    failed, 2 if the bronze bucket could not be reached at all."""
+    settings = get_settings()
+    dst_fs = bronze_fs(settings)
+    root = settings.bronze_bucket
+
+    # Run-level check, so an unreachable MinIO is one clear message and not 21 failures.
+    try:
+        reachable = dst_fs.get_file_info(root).type == FileType.Directory
+    except OSError as exc:
+        print(f"cannot reach bronze bucket {root!r} at {settings.s3_endpoint_url}: {exc}")
+        return 2
+    if not reachable:
+        print(f"bronze bucket {root!r} does not exist at {settings.s3_endpoint_url}")
+        return 2
+
+    days = window_dates()
+    print(f"ingesting {len(days)} days x {len(TABLES)} tables into {root}: {days[0]} .. {days[-1]}")
+    results = run_window(
+        source_fs(),
+        dst_fs,
+        root,
+        days,
+        on_start=lambda table, day: print(f"      {table:<16} {day}  starting ...", flush=True),
+        on_result=lambda r: print(format_result(r), flush=True),
+    )
+
+    counts = {o: sum(r.outcome is o for r in results) for o in Outcome}
+    print(
+        f"\n{counts[Outcome.INGESTED]} ingested, {counts[Outcome.SKIPPED]} skipped, "
+        f"{counts[Outcome.FAILED]} failed"
+    )
+    return exit_code(results)
+
+
+if __name__ == "__main__":
+    sys.exit(main())
