@@ -7,7 +7,7 @@
 #>
 param(
     [Parameter(Position = 0)]
-    [ValidateSet('help', 'setup', 'up', 'down', 'ps', 'logs', 'smoke', 'fmt', 'lint', 'test', 'verify', 'clean')]
+    [ValidateSet('help', 'setup', 'up', 'down', 'ps', 'logs', 'smoke', 'ingest', 'fmt', 'lint', 'test', 'verify', 'clean')]
     [string]$Target = 'help',
 
     # logs only: limit to one service, e.g. `.\dev.ps1 logs redpanda`
@@ -18,7 +18,9 @@ param(
 $ErrorActionPreference = 'Stop'
 $ProjectDir = Join-Path $PSScriptRoot 'projects/01-chain-risk-copilot'
 
-# Run a native command in the project directory; stop on a non-zero exit.
+# Run a native command in the project directory. On a non-zero exit, stop and exit with that
+# same code: for smoke and ingest the code is the result (ingest uses 1 = partitions failed,
+# 2 = bucket unreachable), so it must reach the caller as-is, as `make` passes it through.
 function Invoke-Step {
     param([string]$Exe, [string[]]$Arguments)
     Push-Location $ProjectDir
@@ -31,10 +33,17 @@ function Invoke-Step {
         $ErrorActionPreference = 'Continue'
         $global:LASTEXITCODE = $null
         & $resolved @Arguments
-        # $null means the process never ran (no exit code was set): fail, never pass.
-        if ($LASTEXITCODE -ne 0) { throw "'$Exe $($Arguments -join ' ')' failed with exit code $LASTEXITCODE" }
+        # Captured inside the try so Pop-Location still runs before we exit.
+        $code = $LASTEXITCODE
     }
     finally { Pop-Location }
+    if ($code -ne 0) {
+        # $null means the process never ran (no exit code was set): fail, never pass.
+        # `exit $null` would exit 0, so map it to 1 explicitly.
+        $exitCode = if ($null -eq $code) { 1 } else { $code }
+        Write-Host "dev.ps1: '$Exe $($Arguments -join ' ')' exited $exitCode" -ForegroundColor Red
+        exit $exitCode
+    }
 }
 
 # One definition of each step list, so `verify` can never drift from `lint` and `test`.
@@ -63,6 +72,7 @@ switch ($Target) {
   ps       Show service status
   logs     Follow logs (all services, or: .\dev.ps1 logs redpanda)
   smoke    Run the end-to-end smoke test against the running stack
+  ingest   Ingest the 7-day window into bronze (needs the stack up)
   fmt      Format and auto-fix with ruff
   lint     ruff check, ruff format --check, mypy
   test     Unit tests (no running stack needed)
@@ -96,6 +106,7 @@ switch ($Target) {
         Invoke-Compose $a
     }
     'smoke' { Invoke-Step 'uv' @('run', 'python', 'scripts/smoke_test.py') }
+    'ingest' { Invoke-Step 'uv' @('run', 'python', '-m', 'chainrisk.ingest.bronze') }
     'fmt'   { Invoke-Steps $FmtSteps }
     'lint'  { Invoke-Steps $LintSteps }
     'test'  { Invoke-Steps $TestSteps }

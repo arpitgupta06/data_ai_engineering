@@ -10,7 +10,8 @@ DEV_PS1 = (REPO_ROOT / "dev.ps1").read_text(encoding="utf-8")
 # Deliberately hardcoded, not derived from the Makefile: adding a target means editing the
 # Makefile, dev.ps1 and this set, so it cannot happen by accident. Do not "simplify" it away.
 EXPECTED = {
-    "help", "setup", "up", "down", "ps", "logs", "smoke", "fmt", "lint", "test", "verify", "clean",
+    "help", "setup", "up", "down", "ps", "logs", "smoke", "ingest", "fmt", "lint", "test",
+    "verify", "clean",
 }  # fmt: skip
 
 

@@ -53,11 +53,25 @@ into six tables. Verified structure:
 
 ### Two details that matter more than they look
 
-**`value` is not dollars.** It's in *wei* — 10^18 wei = 1 ETH — stored as
-`DECIMAL(38,0)`. A transfer of 1 ETH is the integer `1000000000000000000`. Every
-token has its own decimal precision too, and USDT uses 6 while most use 18. Get this
-wrong and every number you report is off by a factor of a trillion. This is a real
-data-quality problem, not a footnote.
+**`value` is not dollars.** It's in *wei* — 10^18 wei = 1 ETH. A transfer of 1 ETH is
+the integer `1000000000000000000`. Every token has its own decimal precision too, and
+USDT uses 6 while most use 18. Get this wrong and every number you report is off by a
+factor of a trillion. This is a real data-quality problem, not a footnote.
+
+**`value` arrives as `float64`, not an exact integer.** The public dataset delivers
+`value` as a double in both `transactions` and `token_transfers`. A float64 has 53 bits
+of mantissa, so it holds integers exactly only up to 2^53 (~9.0×10^15 wei, ~0.009 ETH).
+Anything larger is already rounded in the source file. This happened upstream and
+cannot be recovered at ingest: casting to `DECIMAL(38,0)` would preserve the rounded
+float, not the lost digits.
+
+What that costs: the error sits in the last few wei of a ~18-digit figure. That is
+irrelevant for risk scoring, magnitude ranking and flow tracing. It is fatal for exact
+balance reconciliation. So the platform may say "this wallet received ~14.7 ETH across
+23 transfers" and must never claim "this address's balance is exactly N wei". For the
+same reason, hot and cold paths cannot be reconciled on summed `value` (float sums
+differ by ordering); reconcile on transaction counts, block coverage and per-address
+transfer counts instead.
 
 **Money moves in `traces`, not just `transactions`.** When a human sends ETH, it
 appears in `transactions`. When a *smart contract* moves ETH internally — which is

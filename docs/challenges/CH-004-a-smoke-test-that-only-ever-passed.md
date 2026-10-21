@@ -162,6 +162,19 @@ outlived the thing it was measuring, or from counting the wrong unit. A stopwatc
 started in a different command is not timing this run. `awk length` counts bytes,
 `ruff` counts characters, and on Windows those differ by one per line.
 
+**An assertion's expected value must not come from the subject under test.** A test
+whose expected value is derived from the thing it checks cannot fail for the reason it
+exists. It recurred after this ticket closed:
+
+- CRC-13's deadline test compared the deadline with a bound built from the same
+  constants (`45 >= 4 x 2`), so it held whatever the deadline was set to.
+- CRC-15's window test asserted that every gap between days equals the first gap. That
+  is true of any evenly spaced sequence, so a window of every second day would pass a
+  test named "consecutive". The fix is a literal: `[timedelta(days=1)] * 6`.
+
+The rule is one line: pin the expected value as a literal, or compute it somewhere the
+subject cannot influence. Then check the test by breaking the code and watching it fail.
+
 **Distrust a tool's own report of its own success.** Across this ticket and
 CH-003, every wrong turn came from believing a claim instead of checking the
 underlying state: a log line, a tag listing, a stopwatch, a byte count. The

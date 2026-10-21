@@ -73,12 +73,14 @@ def test_derived_endpoints() -> None:
     assert s.kafka_bootstrap_servers == "localhost:19092"
     assert s.schema_registry_url == "http://localhost:18081"
     assert s.s3_endpoint_url == "http://localhost:9000"
+    assert s.s3_endpoint_host_port == "localhost:9000"
 
 
 def test_derived_endpoints_follow_overrides() -> None:
     s = make(kafka_host="broker", kafka_port=9092, minio_host="s3.internal", minio_port=443)
     assert s.kafka_bootstrap_servers == "broker:9092"
     assert s.s3_endpoint_url == "http://s3.internal:443"
+    assert s.s3_endpoint_host_port == "s3.internal:443"
 
 
 def test_postgres_dsn() -> None:
