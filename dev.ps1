@@ -18,7 +18,9 @@ param(
 $ErrorActionPreference = 'Stop'
 $ProjectDir = Join-Path $PSScriptRoot 'projects/01-chain-risk-copilot'
 
-# Run a native command in the project directory; stop on a non-zero exit.
+# Run a native command in the project directory. On a non-zero exit, stop and exit with that
+# same code: for smoke and ingest the code is the result (ingest uses 1 = partitions failed,
+# 2 = bucket unreachable), so it must reach the caller as-is, as `make` passes it through.
 function Invoke-Step {
     param([string]$Exe, [string[]]$Arguments)
     Push-Location $ProjectDir
@@ -31,10 +33,17 @@ function Invoke-Step {
         $ErrorActionPreference = 'Continue'
         $global:LASTEXITCODE = $null
         & $resolved @Arguments
-        # $null means the process never ran (no exit code was set): fail, never pass.
-        if ($LASTEXITCODE -ne 0) { throw "'$Exe $($Arguments -join ' ')' failed with exit code $LASTEXITCODE" }
+        # Captured inside the try so Pop-Location still runs before we exit.
+        $code = $LASTEXITCODE
     }
     finally { Pop-Location }
+    if ($code -ne 0) {
+        # $null means the process never ran (no exit code was set): fail, never pass.
+        # `exit $null` would exit 0, so map it to 1 explicitly.
+        $exitCode = if ($null -eq $code) { 1 } else { $code }
+        Write-Host "dev.ps1: '$Exe $($Arguments -join ' ')' exited $exitCode" -ForegroundColor Red
+        exit $exitCode
+    }
 }
 
 # One definition of each step list, so `verify` can never drift from `lint` and `test`.
