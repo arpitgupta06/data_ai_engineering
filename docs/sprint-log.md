@@ -52,7 +52,8 @@ one command (`.\dev.ps1 ingest`). Decisions worth keeping:
   stale (re-delivered by AWS, or ingested under older columns).
 - Files stream through `iter_batches`; row counts are compared three ways per file
   (source footer, rows streamed, destination footer).
-- 38 new tests, 81 in total, no network. Checked by mutating the code: one
+- 38 new test cases (34 test functions, expanded by parametrization) in
+  `test_bronze_ingest.py`, 81 in total, no network. Checked by mutating the code: one
   mutation (data deleted before the marker) survived the first test, which
   interrupted the wrong moment, and the test was rewritten.
 
@@ -68,7 +69,7 @@ truncated an untracked file (CH-005; CH-004 extended with the recurring "expecte
 value derived from the thing under test" pattern).
 
 **2026-10-24** — Honest state of CRC-15: it merged with the full-window run
-unfinished. Bronze holds 6 of 21 partitions (`blocks` 3 of 7, `transactions` 2 of
+unfinished. *Resolved 2026-10-26, below.* Bronze holds 6 of 21 partitions (`blocks` 3 of 7, `transactions` 2 of
 7, `token_transfers` 1 of 7); the rest are missing and one run was interrupted
 mid-`transactions`. So the 7-day end-to-end result, a second-pass skip count, and
 peak memory are all unmeasured; the memory question is recorded in CRC-17's notes.
@@ -77,3 +78,29 @@ despite a reminder, so a reminder is not a control. A CI story is needed: `make
 verify` on every PR plus a Conventional Commits title check. No
 `.github/workflows` exists yet.
 Next: finish the 21-partition run, CI story, CRC-16.
+
+**2026-10-26** — CRC-15 evidence completed. The 21-partition run finished (it was
+run by hand, so its wall time and peak memory were not taken). Checked read-only
+against the source: all 21 partitions have a `_SUCCESS` marker, no data without a
+marker, and for every one the marker rows == bronze footer rows == source footer rows
+(0 mismatches; written columns equal `COLUMNS[table]`). Window totals: `blocks`
+50,218 rows, `transactions` 12,695,803, `token_transfers` 25,762,006. A second
+pass skipped all 21 with nothing rewritten: `0 ingested, 21 skipped, 0 failed`,
+11.7 s, exit 0.
+The recovery path was exercised at real size: `transactions` 2026-10-04 (an empty
+file) and `token_transfers` 2026-10-02 (351 MB), both left by interrupted runs with
+no marker, are now complete and match the source (1,526,358 and 4,145,489 rows).
+I did not watch that run, so what is evidenced is the before and after states, not
+the clearing itself.
+First-run wall time for the whole window can no longer be obtained, since every run
+now skips. Instead, one partition was re-ingested on purpose: `transactions`
+2026-10-01 (2,036,041 rows, the largest), marker deleted so it read as absent and
+went through the recovery path. Result: 70.3 s wall time (network-bound, so it
+varies with the link), process peak working set 557 MiB against a 50 MiB
+interpreter baseline, Arrow memory pool peak 358 MiB. Peak is the OS-tracked
+counter read in-process (`GetProcessMemoryInfo`), not sampled. The partition
+came back with marker rows == bronze footer rows == source footer rows, and the
+other 20 still matched (0 mismatches). That is the per-task memory envelope CRC-17
+needs; it is from one run on one date.
+Next: CI story (CRC-18), CRC-16 profiling; replace the "not measured" comment in
+`bronze.py` with this figure (rides along with CRC-16 or CRC-18).
