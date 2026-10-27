@@ -63,20 +63,29 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
+          # `style` is used on main (CRC-14). Not a list entry comment: inside a `|`
+          # block a "# ..." is part of the value, so notes live out here.
           types: |
             feat
             fix
             chore
             docs
+            style
             test
             refactor
             perf
             build
             ci
-          requireScope: true
+          # Repo-wide changes have no honest scope, so it is optional; when given it
+          # must be in the list below (`feat(nonsense):` still fails).
+          # `smoke` is on main as #2; `dev` is Makefile / dev.ps1.
+          requireScope: false
           scopes: |
             infra
             ingest
+            smoke
+            dev
+            tests
             stream
             dbt
             dags

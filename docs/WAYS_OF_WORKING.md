@@ -52,7 +52,7 @@ uncertainty, not hours. 8 means "too big, probably split it."
 
 ```
 feature/CRC-12-redpanda-dual-listeners     new capability
-fix/CRC-19-minio-init-race                 defect
+fix/CRC-24-minio-init-race                 defect
 chore/CRC-08-makefile-entrypoint           tooling, deps, config
 docs/CRC-31-phase1-runbook                 documentation only
 spike/CRC-22-rpc-provider-comparison       timeboxed investigation, throwaway
@@ -73,15 +73,21 @@ Rules:
 <type>(<scope>): <subject> (CRC-NN)
 
 feat(infra): add redpanda with dual kafka listeners (CRC-12)
-fix(ingest): handle empty s3 partition without raising (CRC-19)
+fix(ingest): handle empty s3 partition without raising (CRC-24)
 chore(ci): cache uv dependencies between runs (CRC-10)
-docs(adr): record decision on finality depth (CRC-22)
+docs: record decision on finality depth (CRC-22)
 test(dbt): add uniqueness test on dim_address surrogate key (CRC-41)
 refactor(agent): extract tool registry from graph builder (CRC-58)
 ```
 
-Types: `feat`, `fix`, `chore`, `docs`, `test`, `refactor`, `perf`, `build`, `ci`.
-Scopes used here: `infra`, `ingest`, `stream`, `dbt`, `dags`, `agent`, `ci`, `tf`, `docs`.
+Types: `feat`, `fix`, `chore`, `docs`, `style`, `test`, `refactor`, `perf`, `build`, `ci`.
+Scopes: `infra`, `ingest`, `smoke`, `dev`, `tests`, `stream`, `dbt`, `dags`, `agent`,
+`ci`, `tf`, `docs`. The scope is optional (repo-wide changes have none), but when
+given it must be on this list. CI (`pr-title`) enforces all of this on the PR title.
+
+Every PR title ends in a Jira key. Changes that belong to no story (sprint logs,
+retros, process docs) use the standing ticket **CRC-19**. It is an exception for
+work with no story, not a way to skip writing a real ticket.
 
 Subject: imperative mood, lower case, no trailing period, under 72 characters.
 Body: explain **why**, not what — the diff already shows what.
