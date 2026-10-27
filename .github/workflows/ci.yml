@@ -1,0 +1,100 @@
+# CI for the repo. Two required checks: `verify` and `pr-title`.
+#
+# `verify` does not keep its own list of steps: it calls `make verify`, which is
+# the single definition of lint (ruff check, ruff format --check, mypy) + test
+# (pytest). To change what CI runs, change the Makefile.
+#
+# Third-party actions are pinned by commit SHA (same rule as ADR 0005 for images);
+# the trailing comment is the release the SHA was taken from.
+
+name: ci
+
+on:
+  pull_request:
+    branches: [main]
+    # `edited` re-runs the title check when the PR title changes.
+    types: [opened, edited, synchronize, reopened]
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    name: verify
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - uses: astral-sh/setup-uv@07a047e608db84b3d8c06cd9a7c7dcc9c355c18e # v10.3.2
+
+      # The documented developer path, run on a clean clone: writes infra/.env,
+      # uv sync --all-groups, installs hooks. UV_LOCKED makes that sync fail if
+      # uv.lock is out of date, so CI cannot resolve different versions than dev.
+      - name: make setup
+        env:
+          UV_LOCKED: "1"
+        run: make setup
+
+      - name: make verify
+        env:
+          UV_LOCKED: "1"
+        run: make verify
+
+  pr-title:
+    name: pr-title
+    # Nothing to validate on a push to main (the squash title is already set).
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      pull-requests: read
+    steps:
+      # <type>(<scope>): <subject> (CRC-NN) - docs/WAYS_OF_WORKING.md section 5.
+      # The default `Chore/crc 14 developer entrypoint` form has no type, scope
+      # or key, so it fails here.
+      - uses: amannn/action-semantic-pull-request@48f256284bd46cdaab1048c3721360e808335d50 # v6.1.1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          # `style` is used on main (CRC-14). Not a list entry comment: inside a `|`
+          # block a "# ..." is part of the value, so notes live out here.
+          types: |
+            feat
+            fix
+            chore
+            docs
+            style
+            test
+            refactor
+            perf
+            build
+            ci
+          # Repo-wide changes have no honest scope, so it is optional; when given it
+          # must be in the list below (`feat(nonsense):` still fails).
+          # `smoke` is on main as #2; `dev` is Makefile / dev.ps1.
+          requireScope: false
+          scopes: |
+            infra
+            ingest
+            smoke
+            dev
+            tests
+            stream
+            dbt
+            dags
+            agent
+            ci
+            tf
+            docs
+          # Lower-case start, Jira key at the end.
+          subjectPattern: ^[a-z].* \(CRC-[0-9]+\)$
+          subjectPatternError: |
+            The subject "{subject}" must start lower-case and end with the Jira key,
+            e.g. "feat(ingest): stream a partition into bronze (CRC-15)".
