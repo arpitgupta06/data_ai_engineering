@@ -9,7 +9,7 @@ is 1 if any partition mismatched. The 2026-10-26 sprint-log figures came from th
 """
 
 import sys
-from collections.abc import Sequence
+from collections.abc import Callable, Sequence
 from datetime import date
 from typing import NamedTuple
 
@@ -37,6 +37,7 @@ class PartitionCheck(NamedTuple):
     source_rows: int
     bronze_rows: int
     marker_rows: int | None
+    detail: str = ""
 
 
 def footer_rows(fs: FileSystem, infos: Sequence[FileInfo]) -> int:
@@ -72,8 +73,38 @@ def check_partition(
     return PartitionCheck(table, day, ok, source_rows, bronze_rows, marker.rows if marker else None)
 
 
+def check_window(
+    src_fs: FileSystem,
+    dst_fs: FileSystem,
+    root: str,
+    days: Sequence[date],
+    tables: Sequence[str] = TABLES,
+    on_result: Callable[[PartitionCheck], None] | None = None,
+) -> list[PartitionCheck]:
+    """Check every table-day. One bad partition never stops the rest.
+
+    Mirrors run_window: any Exception (missing source, corrupt marker, dropped connection)
+    is that partition failing, recorded with its reason. KeyboardInterrupt still propagates.
+    """
+    checks: list[PartitionCheck] = []
+    for table in tables:
+        for day in days:
+            try:
+                check = check_partition(src_fs, dst_fs, root, table, day)
+            except Exception as exc:
+                check = PartitionCheck(
+                    table, day, False, 0, 0, None, f"{type(exc).__name__}: {exc}"
+                )
+            checks.append(check)
+            if on_result:
+                on_result(check)
+    return checks
+
+
 def format_check(check: PartitionCheck) -> str:
     label = "ok " if check.ok else "BAD"
+    if check.detail:
+        return f"{label} {check.table:<16} {check.day} {check.detail}"
     return (
         f"{label} {check.table:<16} {check.day} rows={check.bronze_rows:>10,} "
         f"src={check.source_rows:>10,} marker={check.marker_rows}"
@@ -81,18 +112,27 @@ def format_check(check: PartitionCheck) -> str:
 
 
 def main() -> int:
+    """Exit 0 if every partition matched, 1 if any did not, 2 if bronze is unreachable."""
     settings = get_settings()
-    src_fs, dst_fs = source_fs(), bronze_fs(settings)
-    if dst_fs.get_file_info(settings.bronze_bucket).type != FileType.Directory:
-        print(f"bronze bucket {settings.bronze_bucket!r} not found; is the stack up?")
+    root = settings.bronze_bucket
+    dst_fs = bronze_fs(settings)
+    try:
+        reachable = dst_fs.get_file_info(root).type == FileType.Directory
+    except OSError as exc:
+        print(f"cannot reach bronze bucket {root!r} at {settings.s3_endpoint_url}: {exc}")
+        return 2
+    if not reachable:
+        print(f"bronze bucket {root!r} does not exist at {settings.s3_endpoint_url}")
         return 2
 
-    mismatches = 0
-    for table in TABLES:
-        for day in window_dates():
-            check = check_partition(src_fs, dst_fs, settings.bronze_bucket, table, day)
-            mismatches += not check.ok
-            print(format_check(check), flush=True)
+    checks = check_window(
+        source_fs(),
+        dst_fs,
+        root,
+        window_dates(),
+        on_result=lambda c: print(format_check(c), flush=True),
+    )
+    mismatches = sum(not c.ok for c in checks)
     print("MISMATCHES:", mismatches)
     return 1 if mismatches else 0
 

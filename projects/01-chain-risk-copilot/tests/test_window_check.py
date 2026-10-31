@@ -77,3 +77,25 @@ def test_a_lost_part_file_is_bad(window_check: ModuleType, src_fs: FileSystem, r
     check = window_check.check_partition(src_fs, dst, root, TABLE, DAY)
     assert not check.ok
     assert check.bronze_rows == 0
+
+
+def test_a_missing_source_partition_is_recorded_not_raised(
+    window_check: ModuleType, src_fs: FileSystem, root: str
+) -> None:
+    other = date(2026, 10, 2)  # no source files were written for this day
+    checks = window_check.check_window(src_fs, LocalFileSystem(), root, [other], [TABLE])
+    assert [c.ok for c in checks] == [False]
+    assert "SourcePartitionMissingError" in checks[0].detail
+    assert str(other) in checks[0].detail
+
+
+def test_a_corrupt_marker_fails_that_partition_and_the_rest_still_run(
+    window_check: ModuleType, src_fs: FileSystem, root: str
+) -> None:
+    dst = LocalFileSystem()
+    ingest_partition(src_fs, dst, root, TABLE, DAY)
+    Path(marker_path(root, TABLE, DAY)).write_text("{not json")
+    checks = window_check.check_window(src_fs, dst, root, [DAY, date(2026, 10, 2)], [TABLE])
+    assert len(checks) == 2
+    assert not checks[0].ok
+    assert "CorruptMarkerError" in checks[0].detail
