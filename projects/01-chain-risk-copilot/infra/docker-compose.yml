@@ -141,6 +141,8 @@ services:
         condition: service_healthy
     environment:
       MC_HOST_local: http://${MINIO_ROOT_USER:?set MINIO_ROOT_USER in infra/.env}:${MINIO_ROOT_PASSWORD:?set MINIO_ROOT_PASSWORD in infra/.env}@minio:9000
+    # --ignore-existing suppresses the error, not the message: "Bucket created successfully"
+    # prints on every run, even when the bucket already existed (CH-003).
     command: ["mb", "--ignore-existing", "local/chainrisk-bronze", "local/chainrisk-artifacts"]
     restart: "no"
 
