@@ -50,8 +50,34 @@ safe to re-run and never overwrites your values. The example values are fine for
 | `make up` / `make down` | Start (and wait for healthy) / stop, **keeping data** |
 | `make ps` / `make logs` | Service status / follow logs (`make logs SERVICE=redpanda`) |
 | `make smoke` | Run the end-to-end smoke test |
+| `make ingest` | Ingest the 7-day window into bronze (needs the stack up) |
+| `make profile` | Profile every committed bronze partition into `chainrisk-artifacts` (see below) |
 | `make fmt` / `make lint` / `make test` | Format / ruff + mypy / unit tests (no stack needed) |
 | `make clean` | **Destroys data**: `down -v` removes the stack's volumes. The only target that does |
+
+### Bronze profiles
+
+`make profile` writes one Parquet object per table-day, one row per column, to
+`chainrisk-artifacts/profiles/bronze/eth/<table>/<YYYY-MM-DD>.parquet`. Each row has the
+partition's `rows` and `bytes_on_disk`, and per column `null_count`, `null_rate`,
+`empty_count` (text columns only: the source writes `''` for "none", which a null rate
+cannot see), `min_value`/`max_value` (numeric and timestamp columns, stored as text) and
+`distinct_count` (address columns only). Re-running replaces the object, never appends. A partition with no
+`_SUCCESS` is skipped and listed, never profiled as empty. Exit code 1 means a partition
+failed (skips do not); 2 means a bucket was unreachable.
+
+Read the whole window from DuckDB (credentials are the `MINIO_ROOT_*` values in `infra/.env`):
+
+```sql
+INSTALL httpfs; LOAD httpfs;
+SET s3_endpoint='localhost:9000'; SET s3_use_ssl=false; SET s3_url_style='path';
+SET s3_access_key_id='...'; SET s3_secret_access_key='...';
+SELECT day, null_rate FROM read_parquet('s3://chainrisk-artifacts/profiles/bronze/eth/*/*.parquet')
+WHERE table_name = 'transactions' AND column_name = 'to_address' ORDER BY day;
+```
+
+`marker_ingested_at` is the bronze marker's timestamp: if it differs from the partition's
+current marker, the profile describes data that has since been re-ingested.
 
 ### Ports
 
