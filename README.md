@@ -61,9 +61,11 @@ safe to re-run and never overwrites your values. The example values are fine for
 `chainrisk-artifacts/profiles/bronze/eth/<table>/<YYYY-MM-DD>.parquet`. Each row has the
 partition's `rows` and `bytes_on_disk`, and per column `null_count`, `null_rate`,
 `empty_count` (text columns only: the source writes `''` for "none", which a null rate
-cannot see), `min_value`/`max_value` (numeric and timestamp columns, stored as text) and
-`distinct_count` (address columns only). Re-running replaces the object, never appends. A partition with no
-`_SUCCESS` is skipped and listed, never profiled as empty. Exit code 1 means a partition
+cannot see), `out_of_range_count` (columns with a hard limit in `BOUNDS`; today `value`
+above 2^256, which is undecodable, see CH-006), `min_value`/`max_value` (numeric and
+timestamp columns, stored as text) and `distinct_count` (address columns only).
+Re-running replaces the object, never appends. A partition with no `_SUCCESS` is skipped
+and listed, never profiled as empty. Exit code 1 means a partition
 failed (skips do not); 2 means a bucket was unreachable.
 
 `min_value` and `max_value` are text: cast integer columns with `BIGINT`, but `value` with

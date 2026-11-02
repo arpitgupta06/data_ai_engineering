@@ -61,6 +61,14 @@ ADDRESS_COLUMNS = frozenset(
     {"miner", "from_address", "to_address", "receipt_contract_address", "token_address"}
 )
 
+# Inclusive allowed range per column name; a value outside it is counted in
+# out_of_range_count and never dropped or changed. `value` is a uint256 in both tables, so
+# nothing on chain can exceed 2**256 (float64 cannot hold 2**256 - 1, hence the inclusive
+# ceiling). That makes a larger value undecodable, not merely large (CH-006). A bound
+# belongs here only if it is a hard limit: a plausible-but-huge amount is a per-token
+# policy question that no range on a column name can answer.
+BOUNDS: dict[str, tuple[float, float]] = {"value": (0.0, float(2**256))}
+
 # Explicit, not inferred from the data: an all-null column or a zero-row partition must
 # produce the same types as every other, or profiles stop unioning cleanly.
 PROFILE_SCHEMA = pa.schema(
@@ -79,6 +87,8 @@ PROFILE_SCHEMA = pa.schema(
         # Text columns only. The source writes "" where it means "none" (99.9% of
         # transactions.receipt_contract_address), which null_count cannot see.
         pa.field("empty_count", pa.int64()),
+        # Columns listed in BOUNDS only: rows outside the allowed range.
+        pa.field("out_of_range_count", pa.int64()),
         # Numeric and timestamp columns only. Text, so one column holds every type; cast
         # to compare numerically. Integers are plain digits (CAST AS BIGINT), but floats
         # print in scientific notation ("5e+22"), so `value` needs CAST AS DOUBLE.
@@ -98,6 +108,7 @@ class ColumnStats(NamedTuple):
     dtype: str
     null_count: int
     empty_count: int | None
+    out_of_range_count: int | None
     min_value: str | None
     max_value: str | None
     distinct_count: int | None
@@ -110,6 +121,8 @@ class _Accumulator:
         self.field = field
         self.nulls = 0
         self.empties: int | None = 0 if pa.types.is_string(field.type) else None
+        self.bounds = BOUNDS.get(field.name)
+        self.out_of_range: int | None = None if self.bounds is None else 0
         self.low: pa.Scalar | None = None
         self.high: pa.Scalar | None = None
         self.track_range = (
@@ -132,6 +145,10 @@ class _Accumulator:
         self.nulls += column.null_count
         if self.empties is not None:
             self.empties += pc.sum(pc.equal(column, "")).as_py() or 0
+        if self.bounds is not None and self.out_of_range is not None:
+            low, high = self.bounds
+            outside = pc.or_(pc.less(column, low), pc.greater(column, high))
+            self.out_of_range += pc.sum(outside).as_py() or 0
         if self.track_range:
             bounds = pc.min_max(column)
             low, high = bounds["min"], bounds["max"]
@@ -149,6 +166,7 @@ class _Accumulator:
             str(self.field.type),
             self.nulls,
             self.empties,
+            self.out_of_range,
             _text(self.low),
             _text(self.high),
             None if self.uniques is None else len(self.uniques),
@@ -228,6 +246,7 @@ def to_table(
             "null_count": [s.null_count for s in stats],
             "null_rate": [s.null_count / rows if rows else None for s in stats],
             "empty_count": [s.empty_count for s in stats],
+            "out_of_range_count": [s.out_of_range_count for s in stats],
             "min_value": [s.min_value for s in stats],
             "max_value": [s.max_value for s in stats],
             "distinct_count": [s.distinct_count for s in stats],

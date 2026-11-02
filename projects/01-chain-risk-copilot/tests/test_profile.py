@@ -161,6 +161,35 @@ def test_every_address_column_in_bronze_gets_a_distinct_count() -> None:
     assert named_like_an_address == profile.ADDRESS_COLUMNS
 
 
+def test_every_bounded_column_exists_in_bronze() -> None:
+    every_column = {column for columns in COLUMNS.values() for column in columns}
+    assert set(profile.BOUNDS) <= every_column
+
+
+def test_out_of_range_counts_rows_outside_the_bound_and_leaves_them_in_place() -> None:
+    uint256_ceiling = float(2**256)
+    schema = pa.schema([("value", pa.float64()), ("gas_used", pa.int64())])
+    data = pa.table(
+        {
+            "value": [0.0, 5e22, uint256_ceiling, -1.0, 1.9e202, None, 1.4e125],
+            "gas_used": [1, 2, 3, 4, 5, 6, 7],
+        },
+        schema=schema,
+    )
+    rows, stats = aggregate(schema, data.to_batches(max_chunksize=3))
+    got = {s.column: s for s in stats}
+    assert rows == 7  # nothing is dropped
+    assert got["value"].out_of_range_count == 3  # -1, 1.9e202, 1.4e125; the ceiling is allowed
+    assert got["value"].max_value == "1.9e+202"
+    assert got["gas_used"].out_of_range_count is None  # not in BOUNDS
+
+
+def test_a_column_with_a_bound_but_no_rows_counts_zero() -> None:
+    schema = pa.schema([("value", pa.float64())])
+    _, stats = aggregate(schema, [])
+    assert stats[0].out_of_range_count == 0
+
+
 def test_distinct_count_exists_only_for_address_columns_and_ignores_nulls() -> None:
     data = blocks([1, 2, 3, 4], miners=["a", "b", "a", None])
     _, stats = aggregate(BLOCKS_SCHEMA, data.to_batches())
@@ -200,7 +229,7 @@ def test_an_entirely_null_column_has_a_rate_of_one_and_no_range() -> None:
     got = {s.column: s for s in stats}
     assert rows == 3
     assert got["base_fee_per_gas"] == ColumnStats(
-        "base_fee_per_gas", "int64", 3, None, None, None, None
+        "base_fee_per_gas", "int64", 3, None, None, None, None, None
     )
     assert got["miner"].null_count == 3
     assert got["miner"].distinct_count == 0
