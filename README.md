@@ -66,6 +66,9 @@ cannot see), `min_value`/`max_value` (numeric and timestamp columns, stored as t
 `_SUCCESS` is skipped and listed, never profiled as empty. Exit code 1 means a partition
 failed (skips do not); 2 means a bucket was unreachable.
 
+`min_value` and `max_value` are text: cast integer columns with `BIGINT`, but `value` with
+`DOUBLE`, because floats are stored in scientific notation (`5e+22`).
+
 Read the whole window from DuckDB (credentials are the `MINIO_ROOT_*` values in `infra/.env`):
 
 ```sql

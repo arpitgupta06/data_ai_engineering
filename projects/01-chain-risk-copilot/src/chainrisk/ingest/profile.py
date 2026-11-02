@@ -80,7 +80,8 @@ PROFILE_SCHEMA = pa.schema(
         # transactions.receipt_contract_address), which null_count cannot see.
         pa.field("empty_count", pa.int64()),
         # Numeric and timestamp columns only. Text, so one column holds every type; cast
-        # to compare numerically (e.g. CAST(max_value AS BIGINT) for block_number).
+        # to compare numerically. Integers are plain digits (CAST AS BIGINT), but floats
+        # print in scientific notation ("5e+22"), so `value` needs CAST AS DOUBLE.
         pa.field("min_value", pa.string()),
         pa.field("max_value", pa.string()),
         pa.field("distinct_count", pa.int64()),  # address columns only
@@ -117,6 +118,12 @@ class _Accumulator:
             or pa.types.is_timestamp(field.type)
         )
         # Exact distinct needs every value seen, so keep them in Arrow, not a Python set.
+        # Measured 2026-11-02, OS peak working set over a 53 MiB baseline, one run each:
+        # token_transfers 2026-10-03 (4.27M rows, 3 address columns, the largest) peaks at
+        # 1502 MiB, 924 without distinct, and takes 41 s against 19 s; transactions
+        # 2026-10-01 peaks at 795 MiB against 610. All 21 partitions in one process: 1386
+        # MiB. If that outgrows a task, keep one address column or leave cardinality to
+        # DuckDB's approx_count_distinct.
         self.uniques: pa.Array | None = (
             pa.array([], type=field.type) if field.name in ADDRESS_COLUMNS else None
         )
