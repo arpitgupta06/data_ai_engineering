@@ -151,6 +151,16 @@ def test_aggregate_counts_nulls_and_ranges() -> None:
     assert got["timestamp"].max_value == "2026-10-01 00:00:12.000000000"
 
 
+def test_every_address_column_in_bronze_gets_a_distinct_count() -> None:
+    named_like_an_address = {
+        column
+        for columns in COLUMNS.values()
+        for column in columns
+        if column == "miner" or column.endswith("_address")
+    }
+    assert named_like_an_address == profile.ADDRESS_COLUMNS
+
+
 def test_distinct_count_exists_only_for_address_columns_and_ignores_nulls() -> None:
     data = blocks([1, 2, 3, 4], miners=["a", "b", "a", None])
     _, stats = aggregate(BLOCKS_SCHEMA, data.to_batches())

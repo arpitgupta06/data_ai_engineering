@@ -6,7 +6,7 @@ One Parquet object per table-day in the artifacts bucket, one row per column:
 
     <artifacts>/profiles/bronze/eth/<table>/<YYYY-MM-DD>.parquet
 
-The filename is not ``date=...`` on purpose: each row carries ``date`` itself so a profile
+The filename is not ``date=...`` on purpose: each row carries ``day`` itself so a profile
 is self-describing, and a hive-style path would make a reader see that column twice (the
 same reason bronze data does not carry ``date``). Query the window with a glob:
 
@@ -15,6 +15,12 @@ same reason bronze data does not carry ``date``). Query the window with a glob:
 
 Re-profiling a partition overwrites its object, so there is never a second entry. The
 write is a single PUT, so a reader sees the old profile or the new one, never half of one.
+That single PUT is the whole commit protocol, which is why a profile gets no ``_SUCCESS``
+marker where a bronze partition does: a partition is many objects, and the marker is how
+it commits as one. A killed run leaves the previous profile or none (an S3 upload that
+never completes is never visible); only a local filesystem can leave a truncated file,
+and that fails to open as Parquet instead of reading as wrong numbers. A profile is
+derived data, so re-running is always the repair.
 Nothing in a profile depends on when it was computed (``marker_ingested_at`` comes from the
 marker), so profiling unchanged data twice produces the same rows and diffs clean.
 
@@ -49,8 +55,8 @@ from chainrisk.settings import get_settings
 
 ARTIFACT_PREFIX = "profiles/bronze"
 
-# Columns that hold an address: they get a distinct count. A new address column in
-# COLUMNS must be added here or it is silently left without one.
+# Columns that hold an address: they get a distinct count. Kept in step with COLUMNS by
+# test_every_address_column_in_bronze_gets_a_distinct_count, not by this comment.
 ADDRESS_COLUMNS = frozenset(
     {"miner", "from_address", "to_address", "receipt_contract_address", "token_address"}
 )
