@@ -7,7 +7,7 @@
 #>
 param(
     [Parameter(Position = 0)]
-    [ValidateSet('help', 'setup', 'up', 'down', 'ps', 'logs', 'smoke', 'ingest', 'fmt', 'lint', 'test', 'verify', 'clean')]
+    [ValidateSet('help', 'setup', 'up', 'down', 'ps', 'logs', 'smoke', 'ingest', 'profile', 'fmt', 'lint', 'test', 'verify', 'clean')]
     [string]$Target = 'help',
 
     # logs only: limit to one service, e.g. `.\dev.ps1 logs redpanda`
@@ -19,7 +19,8 @@ $ErrorActionPreference = 'Stop'
 $ProjectDir = Join-Path $PSScriptRoot 'projects/01-chain-risk-copilot'
 
 # Run a native command in the project directory. On a non-zero exit, stop and exit with that
-# same code: for smoke and ingest the code is the result (ingest uses 1 = partitions failed,
+# same code: for smoke, ingest and profile the code is the result (ingest and profile
+# use 1 = partitions failed,
 # 2 = bucket unreachable), so it must reach the caller as-is, as `make` passes it through.
 function Invoke-Step {
     param([string]$Exe, [string[]]$Arguments)
@@ -73,6 +74,7 @@ switch ($Target) {
   logs     Follow logs (all services, or: .\dev.ps1 logs redpanda)
   smoke    Run the end-to-end smoke test against the running stack
   ingest   Ingest the 7-day window into bronze (needs the stack up)
+  profile  Profile every bronze partition into chainrisk-artifacts (needs the stack up)
   fmt      Format and auto-fix with ruff
   lint     ruff check, ruff format --check, mypy
   test     Unit tests (no running stack needed)
@@ -107,6 +109,7 @@ switch ($Target) {
     }
     'smoke' { Invoke-Step 'uv' @('run', 'python', 'scripts/smoke_test.py') }
     'ingest' { Invoke-Step 'uv' @('run', 'python', '-m', 'chainrisk.ingest.bronze') }
+    'profile' { Invoke-Step 'uv' @('run', 'python', '-m', 'chainrisk.ingest.profile') }
     'fmt'   { Invoke-Steps $FmtSteps }
     'lint'  { Invoke-Steps $LintSteps }
     'test'  { Invoke-Steps $TestSteps }

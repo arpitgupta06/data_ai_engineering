@@ -104,3 +104,19 @@ other 20 still matched (0 mismatches). That is the per-task memory envelope CRC-
 needs; it is from one run on one date.
 Next: CI story (CRC-18), CRC-16 profiling; replace the "not measured" comment in
 `bronze.py` with this figure (rides along with CRC-16 or CRC-18).
+
+**2026-11-02** — CRC-16 profiling built (branch `feature/CRC-16-bronze-profile`, PR
+not yet open). `make profile` writes one Parquet object per table-day to
+`chainrisk-artifacts/profiles/bronze/eth/`, one row per column; all 21 partitions
+profiled, 0 failed, about 5 minutes. Memory, measured with the OS peak working set
+over a 53 MiB baseline, one run each: `token_transfers` 2026-10-03 peaks at 1,502 MiB
+(924 without exact distinct counts, 41 s against 19 s), `transactions` 2026-10-01 at
+795 MiB (610 without). Exact distinct stays for now because the ticket asks for it;
+the figures and the two fallbacks are in the comment in `profile.py`.
+The profile found three things about the data, none of them what was expected:
+`receipt_contract_address` is `''`, not null, on 99.9% of transactions; float min/max
+print in scientific notation; and 205 `token_transfers.value` rows exceed 2^256, which
+no ERC-20 amount can. The last is [CH-006](challenges/CH-006-a-value-that-cannot-exist.md).
+Open: silver quarantine rule for `value > 2^256` (nothing applies it yet), not yet
+reported to the dataset maintainers, and two more source oddities noted in CH-006
+(padded `token_transfers` addresses, literal `'None'` in `transactions.to_address`).
