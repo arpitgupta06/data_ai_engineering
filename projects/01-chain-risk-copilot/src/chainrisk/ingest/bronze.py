@@ -271,8 +271,8 @@ def utc_now() -> datetime:
 # read_table(), which would materialise the whole pruned file at once. The floor is one
 # row group of pruned columns in Arrow memory, not one batch: iter_batches decompresses a
 # whole row group and slices batches out of it, so BATCH_ROWS is not the memory dial.
-# The row-group floor is reasoned from the library's behaviour, not measured: no peak
-# figure has been recorded for transactions yet.
+# Measured 2026-10-26 on transactions 2026-10-01 (2,036,041 rows, the largest): process
+# peak working set 557 MiB over a 50 MiB baseline, Arrow pool peak 358 MiB, one run.
 
 BATCH_ROWS = 131_072
 

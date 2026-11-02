@@ -42,6 +42,7 @@ that cost more than half a day, or changed the design, gets an entry.
 | [CH-003](CH-003-minio-eol-registry-lockout.md) | A core dependency went EOL mid-sprint and locked us out of its images | 0 | ops, security, cost | Resolved |
 | [CH-004](CH-004-a-smoke-test-that-only-ever-passed.md) | A smoke test that had only ever been seen to pass | 0 | data-quality, ops | Resolved |
 | [CH-005](CH-005-truncate-before-write.md) | A script truncated an untracked file before it wrote | 1 | ops | Mitigated |
+| [CH-006](CH-006-a-value-that-cannot-exist.md) | A transfer amount larger than the type that holds it | 1 | data-quality | Mitigated |
 
 **Status:** `Open` (live problem) · `Mitigated` (working around it, residual risk)
 · `Resolved` (closed, outcome observed)
