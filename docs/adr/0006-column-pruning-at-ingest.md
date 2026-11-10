@@ -100,6 +100,10 @@ replay risk is not real for as long as the source stays free and public.
 - Ingest authenticates to MinIO as the **root user**. That is acceptable for a local
   stack, but a scoped user with write access to `chainrisk-bronze` only is the
   intended shape. This is a known deferral to P6 (RBAC), not an oversight.
+  The Airflow containers (CRC-17) share the deferral twice over: they get the same MinIO
+  root credentials, and, because `Settings` requires the `POSTGRES_OPS_*` fields, the
+  postgres-ops credentials too, though the ingest never connects to it. Both are fixed
+  together in P6 with scoped users; `Settings` is deliberately not loosened meanwhile.
 - The deviation is scoped to **this source**. It is not a general licence to prune
   bronze for sources that cannot be replayed.
 

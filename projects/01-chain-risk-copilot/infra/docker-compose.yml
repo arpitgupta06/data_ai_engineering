@@ -12,9 +12,56 @@
 #   18082  HTTP Proxy (pandaproxy)             19644  Redpanda Admin API
 #   8085   Redpanda Console                    9000   MinIO S3 API
 #   9001   MinIO console                       5433   Postgres (ops)
-#   8080 is left free for Airflow.
+#   8080   Airflow UI / API server (login: AIRFLOW_ADMIN_* in infra/.env)
 
 name: chainrisk
+
+# Shared by every Airflow container (CRC-17). LocalExecutor: tasks run as subprocesses of the
+# scheduler, so there is no Redis, Celery worker or Flower. The official quick-start compose
+# (CeleryExecutor, nine services) asks for 4 GB for Airflow alone; this stack has 6 GB in total.
+x-airflow-common: &airflow-common
+  # Built from infra/airflow/Dockerfile, whose FROM is pinned by digest.
+  build: ./airflow
+  image: chainrisk-airflow:3.4.0
+  environment: &airflow-common-env
+    AIRFLOW__CORE__EXECUTOR: LocalExecutor
+    # Memory is the constraint (ADR 0003): Airflow plus one ingest task (~0.9 GiB peak, measured)
+    # fits in 6 GB, two ingest tasks at once do not. One task at a time is a correctness
+    # limit, not tuning; raise it only after raising Docker's memory allocation.
+    AIRFLOW__CORE__PARALLELISM: "1"
+    AIRFLOW__CORE__AUTH_MANAGER: airflow.providers.fab.auth_manager.fab_auth_manager.FabAuthManager
+    AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg://${AIRFLOW_DB_USER:?set AIRFLOW_DB_USER in infra/.env}:${AIRFLOW_DB_PASSWORD:?set AIRFLOW_DB_PASSWORD in infra/.env}@airflow-postgres/${AIRFLOW_DB_NAME:?set AIRFLOW_DB_NAME in infra/.env}
+    AIRFLOW__CORE__FERNET_KEY: ${AIRFLOW_FERNET_KEY:?set AIRFLOW_FERNET_KEY in infra/.env}
+    AIRFLOW__API_AUTH__JWT_SECRET: ${AIRFLOW_JWT_SECRET:?set AIRFLOW_JWT_SECRET in infra/.env}
+    AIRFLOW__CORE__EXECUTION_API_SERVER_URL: http://airflow-apiserver:8080/execution/
+    # Paused at creation: the DAG does nothing until it is unpaused on purpose.
+    AIRFLOW__CORE__DAGS_ARE_PAUSED_AT_CREATION: "true"
+    AIRFLOW__CORE__LOAD_EXAMPLES: "false"
+    AIRFLOW__SCHEDULER__ENABLE_HEALTH_CHECK: "true"
+    # The DAG imports chainrisk.ingest.bronze from the mounted source tree (no install step).
+    PYTHONPATH: /opt/airflow/src
+    # chainrisk.settings reads these from the environment; inside a container there is no
+    # infra/.env, and localhost would be the container itself. It also requires the
+    # postgres-ops fields, though the ingest never opens that connection.
+    MINIO_HOST: minio
+    MINIO_PORT: "9000"
+    MINIO_ROOT_USER: ${MINIO_ROOT_USER:?set MINIO_ROOT_USER in infra/.env}
+    MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:?set MINIO_ROOT_PASSWORD in infra/.env}
+    POSTGRES_OPS_USER: ${POSTGRES_OPS_USER:?set POSTGRES_OPS_USER in infra/.env}
+    POSTGRES_OPS_PASSWORD: ${POSTGRES_OPS_PASSWORD:?set POSTGRES_OPS_PASSWORD in infra/.env}
+    POSTGRES_OPS_DB: ${POSTGRES_OPS_DB:?set POSTGRES_OPS_DB in infra/.env}
+  volumes:
+    # dags/ stays at the project root, next to the package it imports (not under infra/).
+    - ../dags:/opt/airflow/dags:ro
+    - ../src:/opt/airflow/src:ro
+    - airflow-logs:/opt/airflow/logs
+  depends_on: &airflow-common-depends-on
+    airflow-postgres:
+      condition: service_healthy
+    airflow-init:
+      condition: service_completed_successfully
+    minio:
+      condition: service_healthy
 
 services:
 
@@ -177,8 +224,90 @@ services:
       start_period: 10s
     restart: unless-stopped
 
+  # ── Orchestration: Airflow (CRC-17) ────────────────────────────
+  # Metadata DB: its own instance, never postgres-ops (that one is wal_level=logical for
+  # Debezium in P5; Airflow's tables there would surface later as a CDC problem).
+  airflow-postgres:
+    image: postgres:16.15
+    container_name: chainrisk-airflow-postgres
+    environment:
+      POSTGRES_USER: ${AIRFLOW_DB_USER:?set AIRFLOW_DB_USER in infra/.env}
+      POSTGRES_PASSWORD: ${AIRFLOW_DB_PASSWORD:?set AIRFLOW_DB_PASSWORD in infra/.env}
+      POSTGRES_DB: ${AIRFLOW_DB_NAME:?set AIRFLOW_DB_NAME in infra/.env}
+    volumes:
+      - airflow-postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U \"$${POSTGRES_USER}\" -d \"$${POSTGRES_DB}\""]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+    restart: unless-stopped
+
+  # One-shot: migrates the metadata DB and creates the admin user, then exits 0. Unlike
+  # minio-init it needs no separate run: the Airflow services depend on it with
+  # service_completed_successfully, so compose runs it first and `up --wait` does not treat
+  # its exit as a failure. Keep it out of the `up` service lists (the drift test enforces it).
+  airflow-init:
+    <<: *airflow-common
+    container_name: chainrisk-airflow-init
+    # `version` is a no-op command; the image entrypoint does the work from these variables.
+    command: version
+    environment:
+      <<: *airflow-common-env
+      _AIRFLOW_DB_MIGRATE: "true"
+      _AIRFLOW_WWW_USER_CREATE: "true"
+      _AIRFLOW_WWW_USER_USERNAME: ${AIRFLOW_ADMIN_USER:?set AIRFLOW_ADMIN_USER in infra/.env}
+      _AIRFLOW_WWW_USER_PASSWORD: ${AIRFLOW_ADMIN_PASSWORD:?set AIRFLOW_ADMIN_PASSWORD in infra/.env}
+    depends_on:
+      airflow-postgres:
+        condition: service_healthy
+    restart: "no"
+
+  airflow-apiserver:
+    <<: *airflow-common
+    container_name: chainrisk-airflow-apiserver
+    command: api-server
+    ports:
+      - "8080:8080"
+    healthcheck:
+      test: ["CMD", "curl", "--fail", "http://localhost:8080/api/v2/monitor/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+    restart: unless-stopped
+
+  # Runs tasks in-process under LocalExecutor, so this is where an ingest task's memory goes.
+  airflow-scheduler:
+    <<: *airflow-common
+    container_name: chainrisk-airflow-scheduler
+    command: scheduler
+    healthcheck:
+      test: ["CMD-SHELL", 'airflow jobs check --job-type SchedulerJob --hostname "$${HOSTNAME}"']
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+    restart: unless-stopped
+
+  # Airflow 3 parses DAG files in their own component (in 2.x the scheduler did it).
+  airflow-dag-processor:
+    <<: *airflow-common
+    container_name: chainrisk-airflow-dag-processor
+    command: dag-processor
+    healthcheck:
+      test: ["CMD-SHELL", 'airflow jobs check --job-type DagProcessorJob --hostname "$${HOSTNAME}"']
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+    restart: unless-stopped
+
 # Named volumes survive `down`; only `down -v` removes them.
 volumes:
   redpanda-data:
   minio-data:
   postgres-ops-data:
+  airflow-postgres-data:
+  airflow-logs:

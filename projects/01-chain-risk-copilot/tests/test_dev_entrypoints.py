@@ -6,6 +6,9 @@ from pathlib import Path
 REPO_ROOT = Path(__file__).resolve().parents[3]
 MAKEFILE = (REPO_ROOT / "Makefile").read_text(encoding="utf-8")
 DEV_PS1 = (REPO_ROOT / "dev.ps1").read_text(encoding="utf-8")
+COMPOSE = (REPO_ROOT / "projects/01-chain-risk-copilot/infra/docker-compose.yml").read_text(
+    encoding="utf-8"
+)
 
 # Deliberately hardcoded, not derived from the Makefile: adding a target means editing the
 # Makefile, dev.ps1 and this set, so it cannot happen by accident. Do not "simplify" it away.
@@ -65,3 +68,22 @@ def test_verify_is_composed_from_lint_and_test_in_both_entrypoints() -> None:
     assert re.search(r"'lint'\s*\{\s*Invoke-Steps \$LintSteps\s*\}", DEV_PS1)
     assert re.search(r"'test'\s*\{\s*Invoke-Steps \$TestSteps\s*\}", DEV_PS1)
     assert re.search(r"'fmt'\s*\{\s*Invoke-Steps \$FmtSteps\s*\}", DEV_PS1)
+
+
+def compose_long_running() -> set[str]:
+    """Services in docker-compose.yml that are not one-shots (`restart: "no"`)."""
+    body = re.split(r"^volumes:", COMPOSE.split("\nservices:\n", 1)[1], flags=re.MULTILINE)[0]
+    blocks = re.split(r"^  (?=[a-z][a-z-]*:\s*$)", body, flags=re.MULTILINE)[1:]
+    return {block.split(":", 1)[0] for block in blocks if 'restart: "no"' not in block}
+
+
+def test_up_waits_on_exactly_the_long_running_services_in_both_entrypoints() -> None:
+    """A new long-running service must be added to `up` in both entrypoints, or it is never
+    started or waited on; a one-shot must stay out, or `--wait` fails when it exits."""
+    make = re.search(r"^LONG_RUNNING := ((?:.*\\\r?\n)*.*)$", MAKEFILE, re.MULTILINE)
+    assert make, "Makefile has no LONG_RUNNING"
+    in_make = set(make.group(1).replace("\\", " ").split())
+    ps1 = re.search(r"\$LongRunning = @\(([^)]*)\)", DEV_PS1)
+    assert ps1, "dev.ps1 has no $LongRunning"
+    in_ps1 = set(re.findall(r"'([^']+)'", ps1.group(1)))
+    assert in_make == in_ps1 == compose_long_running()

@@ -6,7 +6,8 @@
 PROJECT := projects/01-chain-risk-copilot
 COMPOSE := docker compose -f infra/docker-compose.yml
 RUN     := cd $(PROJECT) &&
-LONG_RUNNING := redpanda redpanda-console minio postgres-ops
+LONG_RUNNING := redpanda redpanda-console minio postgres-ops \
+  airflow-postgres airflow-apiserver airflow-scheduler airflow-dag-processor
 
 .DEFAULT_GOAL := help
 .PHONY: help setup up down ps logs smoke ingest profile fmt lint test verify clean
@@ -18,10 +19,13 @@ setup: ## Create infra/.env if absent, uv sync --all-groups, install pre-commit 
 	@$(RUN) if [ -f infra/.env ]; then echo "infra/.env exists - left untouched"; \
 	  else cp infra/.env.example infra/.env && echo "created infra/.env from .env.example"; fi
 	$(RUN) uv sync --all-groups
+	$(RUN) uv run python scripts/fill_env_secrets.py
 	$(RUN) uv run pre-commit install
 
 # `up --wait` counts the one-shot minio-init exiting (0) as a failure, so wait on the
 # long-running services only, then run minio-init separately and use its exit code.
+# airflow-init is not listed: the Airflow services depend on it (service_completed_successfully),
+# so compose runs it first, and a dependency that exits 0 does not fail --wait.
 up: ## Start the stack and wait until every service is healthy
 	$(RUN) $(COMPOSE) up -d --wait $(LONG_RUNNING)
 	$(RUN) $(COMPOSE) up --no-deps --exit-code-from minio-init minio-init

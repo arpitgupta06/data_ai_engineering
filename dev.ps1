@@ -92,12 +92,17 @@ switch ($Target) {
             Write-Host 'created infra/.env from .env.example'
         }
         Invoke-Step 'uv' @('sync', '--all-groups')
+        Invoke-Step 'uv' @('run', 'python', 'scripts/fill_env_secrets.py')
         Invoke-Step 'uv' @('run', 'pre-commit', 'install')
     }
     'up'    {
         # `up --wait` counts the one-shot minio-init exiting (0) as a failure, so wait on the
         # long-running services only, then run minio-init separately and use its exit code.
-        Invoke-Compose @('up', '-d', '--wait', 'redpanda', 'redpanda-console', 'minio', 'postgres-ops')
+        # airflow-init is not listed: the Airflow services depend on it (service_completed_successfully),
+        # so compose runs it first, and a dependency that exits 0 does not fail --wait.
+        $LongRunning = @('redpanda', 'redpanda-console', 'minio', 'postgres-ops',
+            'airflow-postgres', 'airflow-apiserver', 'airflow-scheduler', 'airflow-dag-processor')
+        Invoke-Compose (@('up', '-d', '--wait') + $LongRunning)
         Invoke-Compose @('up', '--no-deps', '--exit-code-from', 'minio-init', 'minio-init')
     }
     'down'  { Invoke-Compose @('down') }
