@@ -97,6 +97,13 @@ The `bronze_ingest` DAG starts paused. **Unpause it** (the toggle in the UI, or
 and it runs once per day of the 7-day window, one day at a time, until the window is in bronze.
 Each run has three tasks, one per table, so **one task is one bronze partition**.
 
+**What to expect:** on an empty bronze bucket the seven runs go one after another and take about
+80 minutes in total (measured on a clean clone, 2026-11-18). That is normal, not stuck: the UI
+shows one run in progress and the rest queued. Steady-state task times are `blocks` about 10 s,
+`transactions` 50–130 s and `token_transfers` 110–145 s; the very first `token_transfers` task
+took 498 s on a cold connection, so do not read that as typical. Once bronze is populated,
+unpausing again finishes in a couple of minutes, because every partition is skipped.
+
 - **Retry one partition:** open the run for that date, select the failed task, *Clear*. The
   other 20 partitions are not touched.
 - **Backfill a date range** (inclusive; `completed` re-runs dates that already have a run):
