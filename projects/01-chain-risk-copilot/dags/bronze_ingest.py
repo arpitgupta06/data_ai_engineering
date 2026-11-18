@@ -69,10 +69,11 @@ with DAG(
     tags=["bronze", "ingest"],
     doc_md=__doc__,
 ) as dag:
-    # Measured on one transactions partition (1.5M rows): about 170 s. token_transfers has
-    # more rows (4.3M on 2026-10-03) and has NOT been timed, so 20 minutes is roughly 2.5x
-    # the extrapolated worst case, not a measured limit. The timeout exists to turn a hung
-    # connection into a retryable failure; tighten it once token_transfers is timed.
+    # Measured in Airflow on a clean-clone run of all 21 partitions (2026-11-18): blocks
+    # 6-28 s, transactions 48-132 s, token_transfers 111-498 s. The 498 s was the very first
+    # partition on a cold connection; the rest of token_transfers took 111-144 s, including
+    # the largest day (4.27M rows). 20 minutes is ~2.4x the slowest observed task. It exists
+    # to turn a hung connection into a retryable failure, not to bound normal work.
     @task(execution_timeout=timedelta(minutes=20))  # type: ignore[untyped-decorator]  # airflow is Any
     def ingest(table: str) -> None:
         # The data interval's start is the partition date. A manually triggered run in
