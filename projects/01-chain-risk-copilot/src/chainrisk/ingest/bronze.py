@@ -37,7 +37,8 @@ SOURCE_REGION = "us-east-2"
 SOURCE_PREFIX = "v1.0/eth"
 
 # Fixed 7-day window (CRC-15). Seven partitions prove backfill, idempotency and
-# completeness as well as seven hundred; parameterised ranges arrive with CRC-17.
+# completeness as well as seven hundred. The Airflow DAG (CRC-17) takes any date through
+# ingest_table_day; this constant is what `make ingest` and the DAG's date bounds use.
 WINDOW_START = date(2026, 10, 1)
 WINDOW_DAYS = 7
 
@@ -413,6 +414,22 @@ def ingest_partition(
     )
     reason = assessment.reason if existing is not None else "new partition"
     return PartitionResult(table, day, Outcome.INGESTED, total, reason)
+
+
+# ── One table-day, for an orchestrator ───────────────────────────────────────────────
+
+
+def ingest_table_day(table: str, day: date, settings: Settings | None = None) -> PartitionResult:
+    """Ingest one table-day with the real clients. The entry point for the Airflow DAG.
+
+    Unlike ``run_window`` this lets exceptions propagate: an orchestrator needs a failed
+    partition to fail its task (and be retried or cleared), not to be recorded and carried
+    past. A current partition returns SKIPPED, so re-running a date is a no-op.
+    """
+    if table not in COLUMNS:
+        raise ValueError(f"unknown table {table!r}; expected one of {', '.join(TABLES)}")
+    settings = settings or get_settings()
+    return ingest_partition(source_fs(), bronze_fs(settings), settings.bronze_bucket, table, day)
 
 
 # ── Running the window ───────────────────────────────────────────────────────────────

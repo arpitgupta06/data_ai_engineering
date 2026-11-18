@@ -41,7 +41,8 @@ On Windows without `make`, use `.\dev.ps1 setup`, `.\dev.ps1 up`, `.\dev.ps1 smo
 target below exists there too.
 
 `make setup` copies `infra/.env.example` to `infra/.env` only if the latter is absent, so it is
-safe to re-run and never overwrites your values. The example values are fine for a local stack.
+safe to re-run and never overwrites your values. The example values are fine for a local stack;
+the two Airflow secrets are generated fresh per clone.
 
 | Target | What it does |
 |---|---|
@@ -84,6 +85,33 @@ WHERE table_name = 'transactions' AND column_name = 'to_address' ORDER BY day;
 `marker_ingested_at` is the bronze marker's timestamp: if it differs from the partition's
 current marker, the profile describes data that has since been re-ingested.
 
+### Airflow: the bronze ingest DAG
+
+`make up` also starts Airflow (UI at <http://localhost:8080>; log in with `AIRFLOW_ADMIN_USER` /
+`AIRFLOW_ADMIN_PASSWORD` from `infra/.env`). Its metadata lives in its own Postgres, never in
+`postgres-ops`. `make setup` generates the Fernet key and JWT secret in `infra/.env`; if you
+copied `.env.example` by hand, run `uv run python scripts/fill_env_secrets.py`.
+
+The `bronze_ingest` DAG starts paused. **Unpause it** (the toggle in the UI, or
+`docker compose -f projects/01-chain-risk-copilot/infra/docker-compose.yml exec airflow-scheduler airflow dags unpause bronze_ingest`)
+and it runs once per day of the 7-day window, one day at a time, until the window is in bronze.
+Each run has three tasks, one per table, so **one task is one bronze partition**.
+
+- **Retry one partition:** open the run for that date, select the failed task, *Clear*. The
+  other 20 partitions are not touched.
+- **Backfill a date range** (inclusive; `completed` re-runs dates that already have a run):
+
+  ```
+  docker compose -f projects/01-chain-risk-copilot/infra/docker-compose.yml exec airflow-scheduler airflow backfill create --dag-id bronze_ingest --from-date 2026-10-01 --to-date 2026-10-07 --reprocess-behavior completed
+  ```
+
+  Re-running a date that is already ingested is a no-op: the tasks succeed with `skipped ... (already ingested)`.
+- **Do not use the UI's *Trigger* button** to ingest a date: a manual run has no data interval,
+  so there is no date to ingest, and its tasks fail at once with a message saying so. Use the
+  backfill command.
+- Only one task runs at a time, deliberately: Airflow plus one ingest task fits in Docker's 6 GB,
+  two ingest tasks do not. See the comments in `dags/bronze_ingest.py` before changing it.
+
 ### Ports
 
 All published on `localhost`.
@@ -98,7 +126,7 @@ All published on `localhost`.
 | 9000 | MinIO S3 API |
 | 9001 | MinIO console — <http://localhost:9001> |
 | 5433 | Postgres (ops) |
-| 8080 | reserved for Airflow |
+| 8080 | Airflow UI — <http://localhost:8080> |
 
 Inside the compose network, containers use `redpanda:9092` rather than `localhost:19092`.
 

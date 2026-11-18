@@ -45,3 +45,6 @@ logs/
 !.vscode/extensions.json
 .DS_Store
 Thumbs.db
+
+# ── claude files ────────────────────────────────────────────────
+.claude/ 

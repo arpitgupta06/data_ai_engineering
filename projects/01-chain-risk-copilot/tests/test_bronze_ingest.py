@@ -43,6 +43,7 @@ from chainrisk.ingest.bronze import (
     exit_code,
     format_result,
     ingest_partition,
+    ingest_table_day,
     marker_path,
     partition_dir,
     read_marker,
@@ -51,6 +52,7 @@ from chainrisk.ingest.bronze import (
     window_dates,
     write_marker,
 )
+from chainrisk.settings import Settings
 
 DAY = date(2026, 10, 1)
 OTHER_DAY = date(2026, 10, 2)
@@ -707,3 +709,48 @@ def test_format_result_names_table_date_and_outcome() -> None:
 def test_partition_layout_is_hive_style_under_eth() -> None:
     assert partition_dir("bucket", "blocks", DAY) == "bucket/eth/blocks/date=2026-10-01"
     assert marker_path("bucket", "blocks", DAY) == "bucket/eth/blocks/date=2026-10-01/_SUCCESS"
+
+
+# ── ingest_table_day: the DAG's entry point ──────────────────────────────────────────
+
+
+@pytest.fixture
+def wired(
+    monkeypatch: pytest.MonkeyPatch, src_fs: FileSystem, dst_fs: FileSystem, root: str
+) -> Settings:
+    """Point the real-client factories at the local fixtures, so the wiring itself runs."""
+    monkeypatch.setattr(bronze, "source_fs", lambda: src_fs)
+    monkeypatch.setattr(bronze, "bronze_fs", lambda _settings: dst_fs)
+    return Settings(
+        _env_file=None,
+        bronze_bucket=root,
+        minio_root_user="u",
+        minio_root_password="p",
+        postgres_ops_user="u",
+        postgres_ops_password="p",
+        postgres_ops_db="d",
+    )
+
+
+def test_ingest_table_day_ingests_then_rerun_is_a_noop(
+    src_base: Path, wired: Settings, root: str
+) -> None:
+    make_source(src_base, "blocks", DAY, rows=6)
+
+    first = ingest_table_day("blocks", DAY, wired)
+    second = ingest_table_day("blocks", DAY, wired)
+
+    assert (first.outcome, first.rows) == (Outcome.INGESTED, 6)
+    assert (second.outcome, second.rows) == (Outcome.SKIPPED, 6)
+    assert bronze_rows(root, "blocks", DAY) == 6
+
+
+def test_ingest_table_day_raises_so_the_task_fails(wired: Settings) -> None:
+    """run_window records a failure and moves on; a DAG task must fail instead."""
+    with pytest.raises(SourcePartitionMissingError, match="blocks 2026-10-01"):
+        ingest_table_day("blocks", DAY, wired)
+
+
+def test_ingest_table_day_rejects_an_unknown_table(wired: Settings) -> None:
+    with pytest.raises(ValueError, match="unknown table 'nope'"):
+        ingest_table_day("nope", DAY, wired)
