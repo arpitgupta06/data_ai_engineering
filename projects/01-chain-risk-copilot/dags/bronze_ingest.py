@@ -28,6 +28,12 @@ from chainrisk.ingest.bronze import (
     ingest_table_day,
 )
 
+# Known cost: this top-level import pulls pyarrow (bronze.py imports it at module level), so
+# the dag-processor loads pyarrow on every parse. Measured: it sits at ~283 MiB, against ~177
+# MiB before the DAG existed. We accept it: one task at a time and seven runs make parse cost
+# irrelevant here. The fix, if it ever matters: move TABLES, WINDOW_START and WINDOW_DAYS into
+# a light module with no pyarrow import, and import ingest_table_day inside the task.
+
 # start_date / end_date / catchup are set together, on purpose.
 #
 # The source window is fixed and historical (CRC-15: 2026-10-01 .. 2026-10-07). With catchup
@@ -67,7 +73,7 @@ with DAG(
     # more rows (4.3M on 2026-10-03) and has NOT been timed, so 20 minutes is roughly 2.5x
     # the extrapolated worst case, not a measured limit. The timeout exists to turn a hung
     # connection into a retryable failure; tighten it once token_transfers is timed.
-    @task(execution_timeout=timedelta(minutes=20))
+    @task(execution_timeout=timedelta(minutes=20))  # type: ignore[untyped-decorator]  # airflow is Any
     def ingest(table: str) -> None:
         # The data interval's start is the partition date. A manually triggered run in
         # Airflow 3 has no logical date and no data interval, so there is no date to ingest;

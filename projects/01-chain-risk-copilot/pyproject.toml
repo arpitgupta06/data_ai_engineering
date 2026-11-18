@@ -51,9 +51,16 @@ markers = [
 [tool.mypy]
 python_version = "3.12"
 strict = true
-files = ["src", "scripts", "tests"]
+files = ["src", "scripts", "tests", "dags"]
 plugins = ["pydantic.mypy"]
 
 [[tool.mypy.overrides]]
 module = ["boto3", "botocore.*", "pyarrow", "pyarrow.*"]
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+# apache-airflow is installed in the Airflow image (infra/airflow/Dockerfile), not in this
+# venv, so its symbols are Any here. The chainrisk side of dags/ is still checked, which is
+# the half that can break: a wrong ingest_table_day call would otherwise fail at task runtime.
+module = ["airflow.*"]
 ignore_missing_imports = true
